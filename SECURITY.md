@@ -12,7 +12,7 @@ Only the latest version of ExamCraft AI is currently supported for security upda
 
 We take the security of this project seriously. If you find a vulnerability, please do not report it via public issues.
 
-Instead, please send an email to **your-email@example.com**.
+Instead, please send an email to **quadriadebisi3@gmail.com**.
 
 We will acknowledge your report within 48 hours and provide a timeline for a fix if necessary. Please include:
 
