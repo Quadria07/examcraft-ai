@@ -181,7 +181,7 @@ export default function FlashcardStudy({ questions, onExit }) {
                         onChange={(e) => setUserAnswer(e.target.value)}
                         placeholder="Type response..."
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full px-3 md:px-4 py-2 md:py-2.5 text-[11px] md:text-xs font-bold text-center focus:outline-none placeholder:text-warmGray-200 placeholder:font-black placeholder:uppercase placeholder:text-[7px] md:placeholder:text-[8px] placeholder:tracking-widest"
+                        className="w-full px-3 md:px-4 py-2 md:py-2.5 text-[11px] md:text-xs font-bold text-center text-gray-900 focus:outline-none placeholder:text-warmGray-200 placeholder:font-black placeholder:uppercase placeholder:text-[7px] md:placeholder:text-[8px] placeholder:tracking-widest"
                       />
                     </div>
                   </div>

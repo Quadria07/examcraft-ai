@@ -267,7 +267,7 @@ export default function Dashboard({
                 value={newSubjectName}
                 onChange={(e) => setNewSubjectName(e.target.value)}
                 placeholder="Course Name (e.g., Quantum Physics)"
-                className="w-full px-6 py-5 bg-cream rounded-xl mb-8 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all font-bold border border-primary/10 focus:border-primary/30"
+                className="w-full px-6 py-5 bg-white text-gray-900 rounded-xl mb-8 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all font-bold border border-primary/10 focus:border-primary/30"
                 onKeyPress={(e) => e.key === 'Enter' && handleAddSubject()}
               />
 

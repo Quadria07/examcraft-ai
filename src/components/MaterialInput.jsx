@@ -139,7 +139,7 @@ export default function MaterialInput({
  }}
  placeholder="Paste your course content, lecture notes, or textbook extracts here..."
  rows={10}
- className="w-full px-6 py-5 border-2 border-gray-50 rounded-xl font-sans text-sm focus:outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-gray-300"
+ className="w-full px-6 py-5 border-2 border-gray-50 bg-white text-gray-900 rounded-xl font-sans text-sm focus:outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-gray-300"
  />
  
  <div className="mt-6">

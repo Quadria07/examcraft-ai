@@ -488,7 +488,7 @@ export default function SubjectPage({
                 value={newUnitTitle}
                 onChange={(e) => setNewUnitTitle(e.target.value)}
                 placeholder="Module Title (e.g., DNA Replication)"
-                className="w-full px-6 py-5 bg-cream rounded-xl mb-8 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all font-bold border border-primary/10 focus:border-primary/30"
+                className="w-full px-6 py-5 bg-white text-gray-900 rounded-xl mb-8 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all font-bold border border-primary/10 focus:border-primary/30"
                 onKeyPress={(e) => e.key === 'Enter' && handleAddUnit()}
               />
 
