@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page Not Found — ExamCraft AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap" rel="stylesheet">
+  <!-- GitHub Pages SPA redirect: stores the path and redirects to index.html -->
+  <script>
+    (function () {
+      var segmentCount = 0; // set to 1 if hosted at github.io/repo-name
+      var loc = window.location;
+      var isGitHubPages = loc.hostname.endsWith('.github.io');
+      if (isGitHubPages) {
+        // Detect if hosted in a subdirectory
+        var pathSegments = loc.pathname.split('/').filter(Boolean);
+        if (pathSegments.length > 0) segmentCount = 1;
+      }
+      loc.replace(
+        loc.protocol + '//' + loc.hostname + (loc.port ? ':' + loc.port : '') +
+        loc.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/?/' +
+        loc.pathname.slice(1).split('/').slice(segmentCount).join('/').replace(/&/g, '~and~') +
+        (loc.search ? '&' + loc.search.slice(1).replace(/&/g, '~and~') : '') +
+        loc.hash
+      );
+    })();
+  </script>
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Nunito Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #faf6f0;
+      color: #38342c;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Subtle animated background pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(74, 124, 89, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(112, 92, 48, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(74, 124, 89, 0.03) 0%, transparent 70%);
+      animation: bgShift 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      0%   { opacity: 0.7; transform: scale(1); }
+      100% { opacity: 1;   transform: scale(1.05); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2.5rem;
+      max-width: 480px;
+      width: 100%;
+    }
+
+    /* Animated 404 number */
+    .error-code {
+      font-size: 8rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -4px;
+      background: linear-gradient(135deg, #4a7c59 0%, #6ba281 40%, #705c30 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      position: relative;
+    }
+
+    .error-code::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 4px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #4a7c59, #705c30);
+      animation: fadeInUp 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /* Leaf icon */
+    .icon-wrap {
+      margin: 2rem auto 1.5rem;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(74, 124, 89, 0.12), rgba(74, 124, 89, 0.06));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeInUp 0.8s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .icon-wrap svg {
+      width: 32px;
+      height: 32px;
+      color: #4a7c59;
+      animation: sway 4s ease-in-out infinite;
+    }
+
+    @keyframes sway {
+      0%, 100% { transform: rotate(-5deg); }
+      50%      { transform: rotate(5deg); }
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #38342c;
+      margin-bottom: 0.5rem;
+      animation: fadeInUp 0.8s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    p {
+      font-size: 0.95rem;
+      color: #817867;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.8s 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: fadeInUp 0.8s 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      font-family: 'Nunito Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4a7c59, #558d65);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(74, 124, 89, 0.25);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(74, 124, 89, 0.35);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: rgba(74, 124, 89, 0.08);
+      color: #4a7c59;
+      border: 1.5px solid rgba(74, 124, 89, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(74, 124, 89, 0.14);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary:active {
+      transform: translateY(0);
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Floating decorative dots */
+    .dot {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    .dot-1 {
+      width: 180px; height: 180px;
+      background: #4a7c59;
+      top: -60px; right: -40px;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .dot-2 {
+      width: 120px; height: 120px;
+      background: #705c30;
+      bottom: -30px; left: -30px;
+      animation: float 10s 2s ease-in-out infinite;
+    }
+
+    .dot-3 {
+      width: 60px; height: 60px;
+      background: #4a7c59;
+      top: 40%; left: 8%;
+      animation: float 7s 1s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-20px) scale(1.05); }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Responsiveness */
+    @media (max-width: 480px) {
+      .error-code {
+        font-size: 5.5rem;
+        letter-spacing: -2px;
+      }
+
+      h1 { font-size: 1.25rem; }
+
+      .btn-group {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Decorative floating dots -->
+  <div class="dot dot-1"></div>
+  <div class="dot dot-2"></div>
+  <div class="dot dot-3"></div>
+
+  <div class="container">
+    <div class="error-code">404</div>
+
+    <div class="icon-wrap">
+      <!-- Leaf / seedling icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75" />
+      </svg>
+    </div>
+
+    <h1>Page not found</h1>
+    <p>The page you're looking for doesn't exist or may have been moved. Let's get you back on track.</p>
+
+    <div class="btn-group">
+      <a href="./" class="btn btn-primary" id="go-home-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+          <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        </svg>
+        Go Home
+      </a>
+      <button class="btn btn-secondary" id="go-back-btn" onclick="history.back()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 19-7-7 7-7"/>
+          <path d="M19 12H5"/>
+        </svg>
+        Go Back
+      </button>
+    </div>
+  </div>
+
+  <noscript>
+    <meta http-equiv="refresh" content="0;URL='./'">
+  </noscript>
+</body>
+</html>
