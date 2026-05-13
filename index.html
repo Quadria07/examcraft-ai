@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary Meta Tags -->
+    <title>ExamCraft AI — AI-Powered CBT Exam Practice Platform</title>
+    <meta name="title" content="ExamCraft AI — AI-Powered CBT Exam Practice Platform" />
+    <meta name="description" content="Practice for your university exams with AI-generated questions, timed assessments, strict marking, and unit progression. Built for NOUN students and beyond." />
+    <meta name="keywords" content="CBT practice, exam preparation, AI questions, NOUN exam, computer based test, university exam practice, study tool, flashcards, question generator" />
+    <meta name="author" content="ExamCraft AI" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#4a7c59" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="ExamCraft AI" />
+    <meta name="apple-mobile-web-app-title" content="ExamCraft AI" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Canonical URL (update this to your actual deployed URL) -->
+    <link rel="canonical" href="https://examcraft-ai.netlify.app/" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="apple-touch-icon" href="./favicon.png" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://examcraft-ai.netlify.app/" />
+    <meta property="og:title" content="ExamCraft AI — AI-Powered CBT Exam Practice Platform" />
+    <meta property="og:description" content="Practice for your university exams with AI-generated questions, timed assessments, strict marking, and unit progression. Built for NOUN students and beyond." />
+    <meta property="og:image" content="./og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ExamCraft AI — AI-Powered CBT Exam Practice Platform" />
+    <meta property="og:site_name" content="ExamCraft AI" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://examcraft-ai.netlify.app/" />
+    <meta name="twitter:title" content="ExamCraft AI — AI-Powered CBT Exam Practice Platform" />
+    <meta name="twitter:description" content="Practice for your university exams with AI-generated questions, timed assessments, strict marking, and unit progression." />
+    <meta name="twitter:image" content="./og-image.png" />
+    <meta name="twitter:image:alt" content="ExamCraft AI — AI-Powered CBT Exam Practice Platform" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "ExamCraft AI",
+      "description": "AI-powered computer-based test (CBT) exam practice platform with question generation, timed exams, strict marking, and unit progression.",
+      "url": "https://examcraft-ai.netlify.app/",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "AI-powered question generation",
+        "Timed exam mode",
+        "Strict answer evaluation",
+        "Unit progression system",
+        "Flashcard study mode",
+        "Performance analytics",
+        "Dark mode support",
+        "Offline-capable (localStorage)"
+      ],
+      "screenshot": "./og-image.png",
+      "softwareVersion": "0.1.0"
+    }
+    </script>
+
+    <!-- GitHub Pages SPA redirect handler -->
+    <script>
+      (function(l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location))
+    </script>
+  </head>
+  <body>
+    <!-- App root - React mounts here -->
+    <div id="root"></div>
+
+    <!-- Noscript fallback for SEO crawlers and users without JS -->
+    <noscript>
+      <div style="font-family: 'Nunito Sans', sans-serif; text-align: center; padding: 4rem 2rem; max-width: 480px; margin: 0 auto;">
+        <h1 style="color: #4a7c59; font-size: 1.5rem; margin-bottom: 1rem;">ExamCraft AI</h1>
+        <p style="color: #655d4d; line-height: 1.6;">
+          ExamCraft AI is an AI-powered CBT exam practice platform. Generate exam questions from your course material,
+          take timed assessments, review your performance, and progress through units.
+          Please enable JavaScript to use this application.
+        </p>
+      </div>
+    </noscript>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
