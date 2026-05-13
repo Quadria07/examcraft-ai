@@ -269,7 +269,3 @@ For issues, feature requests, or questions:
 ## Contributing
 
 Feel free to fork, modify, and enhance!
-
----
-
-**Built with ❤️ for academic excellence**

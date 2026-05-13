@@ -18,7 +18,6 @@ First off, thank you for considering contributing to ExamCraft AI! It's people l
 2. If you've added code that should be tested, add tests.
 3. Ensure the test suite passes.
 4. Make sure your code follows the existing style.
-5. Write clear, human-sounding commit messages.
 
 ## Development Setup
 
