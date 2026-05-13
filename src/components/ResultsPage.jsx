@@ -20,12 +20,12 @@ export default function ResultsPage({
   const currentAttempt = unit?.attempts[unit.attempts.length - 1]
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY
 
-  if (!currentAttempt || !unit) return null
-
   const [showReviewPanel, setShowReviewPanel] = useState(false)
   const [showFlashcards, setShowFlashcards] = useState(false)
   const [explanations, setExplanations] = useState({}) // questionId -> text
   const [explainingId, setExplainingId] = useState(null) // current questionId being explained
+
+  if (!currentAttempt || !unit) return null
   const isPassed = currentAttempt.percentage >= passMarkPercent
 
   useEffect(() => {

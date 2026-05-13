@@ -23,6 +23,9 @@ export default function SubjectPage({
   const [activeStudyUnit, setActiveStudyUnit] = useState(null)
   const [viewMode, setViewMode] = useState('list') // grid | list
   const [unitToDelete, setUnitToDelete] = useState(null)
+  const [unitConfigs, setUnitConfigs] = useState({}) // unitId -> { difficulty: 'mixed', mcqCount: 12, ... }
+  const [regeneratingId, setRegeneratingId] = useState(null)
+  const [showRegenModalId, setShowRegenModalId] = useState(null)
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY
 
   if (!subject) return null
@@ -134,6 +137,7 @@ export default function SubjectPage({
   
   const progressPercent = total > 0 ? (completed / total) * 100 : 0
 
+
   if (activeStudyUnit) {
     return (
       <FlashcardStudy 
@@ -142,10 +146,6 @@ export default function SubjectPage({
       />
     )
   }
-
-  const [unitConfigs, setUnitConfigs] = useState({}) // unitId -> { difficulty: 'mixed', mcqCount: 12, ... }
-  const [regeneratingId, setRegeneratingId] = useState(null)
-  const [showRegenModalId, setShowRegenModalId] = useState(null)
 
   const handleDifficultyChange = (unitId, difficulty) => {
     setUnitConfigs(prev => ({
