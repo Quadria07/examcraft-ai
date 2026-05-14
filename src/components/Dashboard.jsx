@@ -9,6 +9,7 @@ export default function Dashboard({
  onDeleteSubject,
  onSelectSubject,
  onSettings,
+ onPractice,
 }) {
   const [newSubjectName, setNewSubjectName] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -243,10 +244,10 @@ export default function Dashboard({
                 </p>
               </div>
               <button 
-                onClick={() => setShowAddForm(true)}
+                onClick={onPractice}
                 className="w-full py-4 bg-primary text-cream rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity"
               >
-                Sync New Content
+                Practice Lab (AOC)
               </button>
             </div>
           </div>

@@ -197,20 +197,10 @@ export const generateQuestionsFromMaterial = async (material, groqApiKey, config
 
   const totalRequested = mcqCount + fitbCount + tfCount + ynCount
 
-  const systemPrompt = `You are a university lecturer with a PhD setting examination questions for undergraduate students at the National Open University of Nigeria (NOUN). Your questions must:
-
+  const systemPrompt = `You are a university lecturer setting examination questions. Your questions must:
 1. Be derived STRICTLY and ONLY from the provided course material.
-2. Reflect university-level academic rigor.
-3. Difficulty Level: ${difficulty === 'mixed' ? 'A diverse MIX of EASY, MEDIUM, and HARD questions' : difficulty.toUpperCase()}.
-4. Question Format Requirements:
-   - MCQ: 4 options, 1 correct.
-   - FITB (Fill-in-the-Gap): Exact single-term or short-phrase extracted directly from text.
-   - TRUE_FALSE: Question with "True" or "False" as answer.
-   - YES_NO: Question with "Yes" or "No" as answer.
-5. NOUN Convention: Some MCQ questions may repeat as FITB or T/F to test recognition memory.
-6. Provide Bloom's Taxonomy level for each.
-
-Return ONLY a valid JSON array of objects:
+2. Difficulty Level: ${difficulty.toUpperCase()}.
+3. Return ONLY a valid JSON array of objects:
 {
   "type": "mcq" | "fitb" | "true_false" | "yes_no",
   "question": "...",
@@ -218,15 +208,7 @@ Return ONLY a valid JSON array of objects:
   "answer": "...",
   "difficulty": "${difficulty}",
   "bloomLevel": "..."
-}
-
-Generate exactly ${totalRequested} questions distributed as follows:
-- ${mcqCount} Multiple Choice (MCQ)
-- ${fitbCount} Fill-in-the-Gap (FITB)
-- ${tfCount} True/False (TRUE_FALSE)
-- ${ynCount} Yes/No (YES_NO)
-
-If the material is insufficient, generate as many as possible following these ratios.`
+}`
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -246,6 +228,7 @@ If the material is insufficient, generate as many as possible following these ra
       }),
     })
 
+    if (response.status === 429) throw new Error('RATE_LIMIT')
     if (!response.ok) {
        const errorData = await response.json()
        throw new Error(errorData.error?.message || 'Failed to generate questions')
@@ -270,18 +253,8 @@ If the material is insufficient, generate as many as possible following these ra
 
 export const getQuestionExplanation = async (question, material, groqApiKey) => {
   const prompt = `As an expert academic tutor, explain the answer to this question based on the material provided.
-Focus on teaching the core concept. Keep the explanation concise (2-3 sentences max).
-
-MATERIAL:
-${material.substring(0, 3000)} ...
-
-QUESTION:
-${question.question}
-
-CORRECT ANSWER:
-${question.answer}
-
-EXPLANATION:`
+QUESTION: ${question.question}
+CORRECT ANSWER: ${question.answer}`
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -293,14 +266,15 @@ EXPLANATION:`
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'You are a helpful academic tutor. Provide clear, concise explanations.' },
+          { role: 'system', content: 'Provide clear, concise explanations.' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.5,
         max_tokens: 500,
       }),
     })
-
+    
+    if (response.status === 429) return 'AI is busy. Please try again later.'
     const data = await response.json()
     return data.choices[0].message.content.trim()
   } catch (error) {
@@ -316,7 +290,6 @@ export const getNextUnlockedUnit = (subjects, currentSubjectId, currentUnitIndex
   const currentUnit = subject.units[currentUnitIndex]
   if (!currentUnit) return null
 
-  // If current unit is passed, unlock next unit
   if (currentUnit.status === 'passed' && currentUnitIndex + 1 < subject.units.length) {
     return subject.units[currentUnitIndex + 1]
   }
@@ -342,7 +315,6 @@ export const unlockNextUnit = (subjects, currentSubjectId, currentUnitIndex) => 
   return updatedSubjects
 }
 
-// Shuffle array for question order
 export const shuffleArray = (array) => {
   const shuffled = [...array]
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -352,45 +324,18 @@ export const shuffleArray = (array) => {
   return shuffled
 }
 
-// Format time
 export const formatTime = (seconds) => {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = seconds % 60
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${secs}s`
-  }
+  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`
   return `${minutes}m ${secs}s`
 }
 
 export const proposeUnitsFromMaterial = async (content, groqApiKey) => {
-  if (!groqApiKey) {
-    throw new Error('Groq API key is not configured')
-  }
+  if (!groqApiKey) throw new Error('Groq API key is not configured')
 
-  const wordCount = content.trim().split(/\s+/).length
-  if (wordCount < 200) {
-    throw new Error('Content is too short to be divided into units.')
-  }
-
-  const systemPrompt = `You are an expert curriculum designer. Your task is to analyze a large body of course material and divide it into logical "Units" or "Modules".
-
-For the provided text:
-1. Identify logical thematic breaks.
-2. For each Unit, provide a clear, academic Title.
-3. For each Unit, provide a concise summary or the core content that belongs in that unit.
-4. Aim for units of roughly 500-2000 words each, but prioritize thematic consistency.
-
-Return ONLY a valid JSON array of objects:
-[
-  {
-    "title": "Unit Title",
-    "material": "Full text or detailed content for this unit"
-  }
-]
-
-Do not include any preamble or extra text. Only the JSON array.`
+  const systemPrompt = `Analyze Course Material and divide it into Units. Return JSON array: [{ "title": "Unit Title", "material": "..." }]`
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -403,29 +348,22 @@ Do not include any preamble or extra text. Only the JSON array.`
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analyze and divide this course material into logical units:\n\n${content.substring(0, 20000)}` },
+          { role: 'user', content: content.substring(0, 10000) },
         ],
         temperature: 0.3,
         max_tokens: 8000,
       }),
     })
 
-    if (!response.ok) {
-       const errorData = await response.json()
-       throw new Error(errorData.error?.message || 'Failed to analyze material')
-    }
+    if (response.status === 429) throw new Error('RATE_LIMIT')
+    if (!response.ok) throw new Error('Analysis failed')
 
     const data = await response.json()
     const rawContent = data.choices[0].message.content
-    let jsonString = rawContent
-    const jsonStart = jsonString.indexOf('[')
-    const jsonEnd = jsonString.lastIndexOf(']')
-
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      jsonString = jsonString.substring(jsonStart, jsonEnd + 1)
-    }
-
-    const units = JSON.parse(jsonString)
+    const jsonStart = rawContent.indexOf('[')
+    const jsonEnd = rawContent.lastIndexOf(']')
+    const units = JSON.parse(rawContent.substring(jsonStart, jsonEnd + 1))
+    
     return units.map((u, index) => ({
       ...u,
       id: uuidv4(),
@@ -435,10 +373,45 @@ Do not include any preamble or extra text. Only the JSON array.`
       bestScore: 0
     }))
   } catch (error) {
-    console.error('Smart Chunking Error:', error)
-    if (error.name === 'SyntaxError') {
-      throw new Error('AI response was too large and got truncated. Try uploading a smaller portion of the document.')
-    }
-    throw new Error('Failed to divide material into units. Please try a smaller file or manual pasting.')
+    throw error
+  }
+}
+
+export const transformQuestions = async (questionsList, targetType, groqApiKey) => {
+  if (!groqApiKey) throw new Error('Groq API key is not configured')
+
+  const systemPrompt = `Transform questions into ${targetType.toUpperCase()}. Return JSON array of objects with originalId, type, question, options (for mcq), answer, explanation.`
+
+  const userPrompt = JSON.stringify(questionsList.map(q => ({ id: q.id, text: q.question, answer: q.answer })))
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 4000,
+      }),
+    })
+
+    if (response.status === 429) throw new Error('RATE_LIMIT')
+    if (!response.ok) throw new Error('Transformation failed')
+
+    const data = await response.json()
+    const content = data.choices[0].message.content
+    const jsonStart = content.indexOf('[')
+    const jsonEnd = content.lastIndexOf(']')
+    
+    return JSON.parse(content.substring(jsonStart, jsonEnd + 1))
+  } catch (error) {
+    throw error
   }
 }

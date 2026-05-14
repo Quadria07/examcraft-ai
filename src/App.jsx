@@ -6,12 +6,14 @@ import SubjectPage from './components/SubjectPage'
 import ExamScreen from './components/ExamScreen'
 import ResultsPage from './components/ResultsPage'
 import Settings from './components/Settings'
+import PracticeLab from './components/PracticeLab'
 import { createSubject } from './utils/data'
 
 import Icons from './components/common/Icons'
 
 export default function App() {
  const [subjects, setSubjects] = useLocalStorage('subjects', [])
+ const [practiceLibrary, setPracticeLibrary] = useLocalStorage('practiceLibrary', [])
  const [passMarkPercent, setPassMarkPercent] = useLocalStorage('passMarkPercent', 70)
  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY
 
@@ -132,6 +134,7 @@ export default function App() {
  onDeleteSubject={handleDeleteSubject}
  onSelectSubject={handleGoToSubject}
  onSettings={() => setScreen('settings')}
+ onPractice={() => setScreen('practice')}
  />
  )}
 
@@ -184,8 +187,18 @@ export default function App() {
  subjects={subjects}
  onClearAllData={() => {
  setSubjects([])
+ setPracticeLibrary([])
  setScreen('dashboard')
  }}
+ onBackToDashboard={handleReturnToDashboard}
+ />
+ )}
+
+ {screen === 'practice' && (
+ <PracticeLab
+ practiceLibrary={practiceLibrary}
+ setPracticeLibrary={setPracticeLibrary}
+ groqApiKey={groqApiKey}
  onBackToDashboard={handleReturnToDashboard}
  />
  )}

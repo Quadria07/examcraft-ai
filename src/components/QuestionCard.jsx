@@ -25,9 +25,9 @@ export default function QuestionCard({
           </div>
 
           <h3 className={`font-black text-gray-900 leading-[1.3] tracking-tight font-serif ${
-            question.question.length > 200 ? 'text-xl' : 'text-2xl'
+            (question?.question?.length || 0) > 200 ? 'text-xl' : 'text-2xl'
           }`}>
-            {question.question}
+            {question?.question || 'Question content missing...'}
           </h3>
 
           <div className="flex flex-col gap-4">
