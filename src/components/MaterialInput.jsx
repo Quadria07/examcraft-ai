@@ -12,7 +12,6 @@ export default function MaterialInput({
  const [error, setError] = useState('')
  const [showResetConfirm, setShowResetConfirm] = useState(false)
  const [saveSuccess, setSaveSuccess] = useState(false)
- const groqApiKey = import.meta.env.VITE_GROQ_API_KEY
 
  const wordCount = material.trim().split(/\s+/).filter((w) => w.length > 0).length
 
@@ -54,11 +53,7 @@ export default function MaterialInput({
  ]
 
  const handleGenerateQuestions = async () => {
-   if (!groqApiKey) {
-     setError('API key missing. Please configure VITE_GROQ_API_KEY.')
-     return
-   }
-
+   
    if (material.trim().split(/\s+/).length < 50) {
      setError('Material is too short. Please provide at least 50 words.')
      return
@@ -78,7 +73,7 @@ export default function MaterialInput({
    }, 3000)
 
    try {
-     const questions = await generateQuestionsFromMaterial(material, groqApiKey, config)
+     const questions = await generateQuestionsFromMaterial(material, config)
      
      const updatedUnit = {
        ...unit,

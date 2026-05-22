@@ -1,7 +1,7 @@
 import React from 'react'
 import Icons from './common/Icons'
 
-export default function Header({ title, onSettings }) {
+export default function Header({ title, onSettings, onLogout }) {
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-primary/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
@@ -27,6 +27,15 @@ export default function Header({ title, onSettings }) {
                 title="System Settings"
               >
                 <Icons.Settings className="w-5 h-5" />
+              </button>
+            )}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="w-11 h-11 flex items-center justify-center rounded-xl bg-white border border-primary/10 hover:bg-red-50 transition-all active:scale-95 text-red-500 hover:text-red-600 shadow-sm"
+                title="Logout"
+              >
+                <Icons.X className="w-5 h-5" />
               </button>
             )}
           </div>

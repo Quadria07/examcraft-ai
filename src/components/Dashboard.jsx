@@ -3,6 +3,13 @@ import Header from './Header'
 import Icons from './common/Icons'
 import AnalyticsView from './common/AnalyticsView'
 
+const getGreeting = () => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export default function Dashboard({
  subjects,
  onAddSubject,
@@ -66,12 +73,7 @@ export default function Dashboard({
             <div className="bg-white rounded-xl p-8 border border-primary/5 flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-2">
-                  {(() => {
-                    const hour = new Date().getHours()
-                    if (hour < 12) return 'Good morning'
-                    if (hour < 18) return 'Good afternoon'
-                    return 'Good evening'
-                  })()}, Scholar.
+                  {getGreeting()}, Scholar.
                 </h2>
                 <p className="text-sm text-warmGray-500 font-medium max-w-md italic">
                   "{MOTIVATIONAL_QUOTES[quoteIndex]}"
@@ -355,4 +357,3 @@ const MOTIVATIONAL_QUOTES = [
   "The beautiful thing about learning is that no one can take it away from you.",
   "He who asks is a fool for five minutes, but he who does not ask remains a fool forever."
 ]
-

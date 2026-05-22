@@ -62,7 +62,7 @@ export default function ExamScreen({
   useEffect(() => {
     const interval = setInterval(() => {
       if (shuffledQuestions.length > 0) {
-        saveExamSession(
+        void saveExamSession(
           subjectId,
           unitIndex,
           responses,

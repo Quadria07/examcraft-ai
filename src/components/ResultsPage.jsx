@@ -18,7 +18,6 @@ export default function ResultsPage({
   const subject = subjects.find((s) => s.id === subjectId)
   const unit = subject?.units[unitIndex]
   const currentAttempt = unit?.attempts[unit.attempts.length - 1]
-  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY
 
   const [showReviewPanel, setShowReviewPanel] = useState(false)
   const [showFlashcards, setShowFlashcards] = useState(false)
@@ -158,7 +157,7 @@ export default function ResultsPage({
                               if (explanations[question.id]) return
                               setExplainingId(question.id)
                               try {
-                                const explanation = await getQuestionExplanation(question, unit.material, groqApiKey)
+                                const explanation = await getQuestionExplanation(question, unit.material)
                                 setExplanations(prev => ({ ...prev, [question.id]: explanation }))
                               } catch (err) { console.error(err) } finally { setExplainingId(null) }
                             }}

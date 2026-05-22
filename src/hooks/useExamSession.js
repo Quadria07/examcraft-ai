@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
-
-const EXAM_SESSION_KEY = 'activeExamSession'
+import * as api from '../utils/api'
 
 export const useExamSession = () => {
-  const saveExamSession = (subjectId, unitIndex, responses, flagged, currentQuestionIndex, timerSeconds) => {
+  const saveExamSession = async (subjectId, unitIndex, responses, flagged, currentQuestionIndex, timerSeconds) => {
     const session = {
       subjectId,
       unitIndex,
@@ -13,20 +11,35 @@ export const useExamSession = () => {
       timerSeconds,
       timestamp: new Date().toISOString(),
     }
-    localStorage.setItem(EXAM_SESSION_KEY, JSON.stringify(session))
+
+    try {
+      await api.saveExamSession(session)
+    } catch (error) {
+      console.error('Failed to persist exam session:', error)
+    }
   }
 
-  const getExamSession = () => {
-    const session = localStorage.getItem(EXAM_SESSION_KEY)
-    return session ? JSON.parse(session) : null
+  const getExamSession = async () => {
+    try {
+      const response = await api.getExamSession()
+      return response?.session || null
+    } catch (error) {
+      console.error('Failed to load exam session:', error)
+      return null
+    }
   }
 
-  const clearExamSession = () => {
-    localStorage.removeItem(EXAM_SESSION_KEY)
+  const clearExamSession = async () => {
+    try {
+      await api.clearExamSession()
+    } catch (error) {
+      console.error('Failed to clear exam session:', error)
+    }
   }
 
-  const hasActiveSession = () => {
-    return localStorage.getItem(EXAM_SESSION_KEY) !== null
+  const hasActiveSession = async () => {
+    const session = await getExamSession()
+    return session !== null
   }
 
   return {

@@ -12,8 +12,9 @@ A university-grade Computer-Based Test (CBT) examination platform. This React SP
 ✅ **Results System** - Detailed performance review with Bloom's Taxonomy breakdown  
 ✅ **Responsive Design** - Works seamlessly on desktop, tablet, and mobile  
 ✅ **Dark Mode** - Built-in dark theme toggle  
-✅ **Local Storage** - No backend required - all data stored in browser  
-✅ **Exam Progress Persistence** - Save and resume interrupted exams  
+✅ **Secure Backend Persistence** - MongoDB saved via Netlify serverless API  
+✅ **Secure Cookie Auth** - HTTP-only session cookie for user authentication  
+✅ **Exam Progress Persistence** - Save and resume interrupted exams remotely  
 ✅ **Keyboard Shortcuts** - Arrow keys for navigation, Esc for submit  
 ✅ **Question Search/Filter** - Search questions in real-time during exam  
 
@@ -21,6 +22,8 @@ A university-grade Computer-Based Test (CBT) examination platform. This React SP
 
 - **Frontend**: React 18+ with hooks
 - **Styling**: Tailwind CSS 3.x
+- **Backend**: Netlify serverless functions + MongoDB Atlas
+- **Auth**: JWT session tokens stored in HTTP-only cookies
 - **AI API**: Groq API (openai/gpt-oss-120b model)
 - **Build Tool**: Vite
 - **Build**: ES Modules
@@ -37,14 +40,17 @@ A university-grade Computer-Based Test (CBT) examination platform. This React SP
    cd examcraft-ai-main
    ```
 
-2. **Create .env file with Groq API key**
+2. **Create `.env` file from the example**
    ```bash
    cp .env.example .env
    ```
    
-   Edit `.env` and add your Groq API key (get one free at [console.groq.com/keys](https://console.groq.com/keys)):
-   ```
+   Edit `.env` and add your credentials:
+   ```env
    VITE_GROQ_API_KEY=gsk_your_api_key_here
+   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxx.mongodb.net/examcraft?retryWrites=true&w=majority
+   JWT_SECRET=your_long_random_jwt_secret_here
+   REGISTRATION_INVITE_CODE=Scholar2026
    ```
 
 3. **Install dependencies**
@@ -70,10 +76,11 @@ A university-grade Computer-Based Test (CBT) examination platform. This React SP
 - **Esc**: Submit exam
 
 #### Progress Persistence
-- Your exam progress is **automatically saved every 10 seconds** to localStorage
-- If you close the browser or internet disconnects, you can **resume later**
+- Your exam progress is **automatically saved every 10 seconds** to the secure backend database
+- Authentication uses a secure HTTP-only cookie, so no JWT token is stored in browser localStorage
+- If you close the browser or internet disconnects, you can **resume later** after signing back in
 - When you return to the app, you'll see a dialog to resume or discard the interrupted exam
-- Your responses, flags, and current question position are preserved
+- Your responses, flags, and current question position are preserved remotely
 - Click **"Save & Exit"** button during exam to manually save and exit
 
 #### Question Search/Filter
@@ -115,7 +122,10 @@ A university-grade Computer-Based Test (CBT) examination platform. This React SP
 
 ### Environment Variables (in `.env` file)
 
-- **VITE_GROQ_API_KEY**: Required for question generation. Get from [console.groq.com/keys](https://console.groq.com/keys)
+- **VITE_GROQ_API_KEY**: Required for AI question generation. Get from [console.groq.com/keys](https://console.groq.com/keys)
+- **MONGODB_URI**: Your MongoDB Atlas connection URI used by the backend to persist users and study data.
+- **JWT_SECRET**: A long random secret used to sign JSON Web Tokens for authenticated sessions.
+- **REGISTRATION_INVITE_CODE**: The invitation code required when new users register.
 
 ### Default Settings (in Settings page)
 
@@ -151,7 +161,15 @@ The AI generates questions using Groq's GPT-OSS 120B model with these specificat
 
 ## Data Storage
 
-All data is stored in browser's localStorage:
+All data is persisted in the backend MongoDB database via the Netlify serverless API. This includes:
+
+- subjects and units
+- practice library items
+- user pass mark settings
+- active exam sessions
+- user authentication state via HTTP-only cookie session
+
+Example persisted shape:
 
 ```
 {
@@ -212,9 +230,9 @@ Output is in `dist/` directory. Deploy to any static hosting:
 - Timer requires Enable Timer toggle before exam starts
 
 ### Data not persisting?
-- Check if localStorage is enabled in browser
-- Check if browser is in private/incognito mode
-- Verify browser allows localStorage for domain
+- Check if the backend is running correctly and the API endpoint is reachable
+- Verify `MONGODB_URI`, `JWT_SECRET`, and `REGISTRATION_INVITE_CODE` are configured in `.env`
+- Check browser console for authorization or network errors
 
 ## Performance Tips
 
@@ -245,11 +263,20 @@ src/
 │   ├── ResultsPage.jsx
 │   ├── Settings.jsx
 │   ├── Timer.jsx
-│   └── Header.jsx
+│   ├── Header.jsx
+│   └── common/
+│       ├── AnalyticsView.jsx
+│       ├── FileUpload.jsx
+│       ├── FlashcardStudy.jsx
+│       ├── Icons.jsx
+│       └── UnitSuggester.jsx
 ├── hooks/
-│   └── useLocalStorage.js
+│   └── useExamSession.js
 ├── utils/
-│   └── data.js
+│   ├── api.js
+│   ├── data.js
+│   ├── fileParser.js
+│   └── pdfExport.js
 ├── App.jsx
 ├── main.jsx
 └── index.css

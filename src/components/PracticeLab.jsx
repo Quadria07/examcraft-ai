@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Icons from './common/Icons'
 import { v4 as uuidv4 } from 'uuid'
-import { transformQuestions, evaluateAnswer } from '../utils/data'
+import { transformQuestions, evaluateAnswer, extractPracticeQuestions, validatePracticeQuestions } from '../utils/data'
 import QuestionCard from './QuestionCard'
 import Timer from './Timer'
 import confetti from 'canvas-confetti'
@@ -9,7 +9,6 @@ import confetti from 'canvas-confetti'
 export default function PracticeLab({
   practiceLibrary,
   setPracticeLibrary,
-  groqApiKey,
   onBackToDashboard
 }) {
   const [setupStep, setSetupStep] = useState('select-course') // select-course | select-module | manage-questions | practice | results
@@ -84,57 +83,9 @@ export default function PracticeLab({
     
     try {
       setImportStage('Extracting Knowledge...')
-      let prompt = `Extract questions and answers from the text provided. 
-      CRITICAL RULE 1: The question text MUST remain 100% identical to the source.
-      CRITICAL RULE 2: For every question, you MUST provide a "sourceQuote" which is the exact sentence or fragment from the source text where the answer is found.
-      CRITICAL RULE 3: DO NOT GUESS. If an answer is not physically written in the text, mark answer as "[Needs Review]".
-      
-      If the source HAS options (A, B, C, D), set "type": "mcq" and include the "options" array.
-      Return ONLY a JSON array of objects: { "question": "...", "answer": "...", "type": "...", "options": [...], "sourceQuote": "..." }`
-
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: prompt }, { role: 'user', content: importText }],
-          temperature: 0.1,
-        }),
-      })
-      
-      if (response.status === 429) {
-        throw new Error('RATE_LIMIT')
-      }
-
-      const data = await response.json()
-      const content = data.choices[0].message.content
-      const jsonStart = content.indexOf('[')
-      const jsonEnd = content.lastIndexOf(']')
-      const parsed = JSON.parse(content.substring(jsonStart, jsonEnd + 1))
-      
+      const parsed = await extractPracticeQuestions(importText)
       setImportStage('Strict Validation...')
-      const validationPrompt = `Verify these extracted questions against the original source text. 
-      Update the "confidence" field (0-100).
-      Original Source: """${importText}"""
-      Return ONLY JSON with "confidence" (number) and "validationNote" (string) added.`
-
-      const valResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: validationPrompt }, { role: 'user', content: JSON.stringify(parsed) }],
-          temperature: 0,
-        }),
-      })
-
-      if (valResponse.status === 429) {
-        throw new Error('RATE_LIMIT')
-      }
-
-      const valData = await valResponse.json()
-      const valContent = valData.choices[0].message.content
-      const validated = JSON.parse(valContent.substring(valContent.indexOf('['), valContent.lastIndexOf(']') + 1))
+      const validated = await validatePracticeQuestions(importText, parsed)
 
       const newVersion = {
         id: uuidv4(),
@@ -178,7 +129,7 @@ export default function PracticeLab({
     setImportStage('Generating New Styles...')
     
     try {
-      const transformed = await transformQuestions(baseVersion.questions, targetType, groqApiKey)
+      const transformed = await transformQuestions(baseVersion.questions, targetType)
       
       const newVersion = {
         id: uuidv4(),

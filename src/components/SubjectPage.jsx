@@ -4,7 +4,7 @@ import MaterialInput from './MaterialInput'
 import FileUpload from './common/FileUpload'
 import UnitSuggester from './common/UnitSuggester'
 import FlashcardStudy from './common/FlashcardStudy'
-import { createUnit, proposeUnitsFromMaterial } from '../utils/data'
+import { createUnit, proposeUnitsFromMaterial, generateQuestionsFromMaterial } from '../utils/data'
 import { exportUnitToPDF } from '../utils/pdfExport'
 import Icons from './common/Icons'
 
@@ -26,7 +26,6 @@ export default function SubjectPage({
   const [unitConfigs, setUnitConfigs] = useState({}) // unitId -> { difficulty: 'mixed', mcqCount: 12, ... }
   const [regeneratingId, setRegeneratingId] = useState(null)
   const [showRegenModalId, setShowRegenModalId] = useState(null)
-  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY
 
   if (!subject) return null
 
@@ -75,10 +74,10 @@ export default function SubjectPage({
   const handleFileParsed = async (content) => {
     setProcessingFile(true)
     try {
-      const units = await proposeUnitsFromMaterial(content, groqApiKey)
+      const units = await proposeUnitsFromMaterial(content)
       setSuggestedUnits(units)
     } catch (err) {
-      console.error("Curriculum generation error:", err);
+      console.error("Curriculum generation error:", err)
     } finally {
       setProcessingFile(false)
     }
@@ -155,35 +154,34 @@ export default function SubjectPage({
   }
 
   const handleRegenerateQuestions = async (unit) => {
-    if (!groqApiKey || !unit) return
-    const config = unitConfigs[unit.id] || { 
+    if (!unit) return
+    const config = unitConfigs[unit.id] || {
       difficulty: 'mixed',
       mcqCount: 12,
       fitbCount: 6,
       tfCount: 1,
-      ynCount: 1
+      ynCount: 1,
     }
-    
+
     setRegeneratingId(unit.id)
-    setShowRegenModalId(null) // Close configuration modal when starting synthesis
-    
+    setShowRegenModalId(null)
+
     try {
-      const { generateQuestionsFromMaterial } = await import('../utils/data')
-      const questions = await generateQuestionsFromMaterial(unit.material, groqApiKey, {
+      const questions = await generateQuestionsFromMaterial(unit.material, {
         difficulty: config.difficulty,
         mcqCount: config.mcqCount || 12,
         fitbCount: config.fitbCount || 6,
         tfCount: config.tfCount || 1,
         ynCount: config.ynCount || 1,
       })
-      
+
       const updatedUnit = {
         ...unit,
         questions,
       }
       handleUnitUpdate(unit.id, updatedUnit)
     } catch (err) {
-      console.error("Regeneration error:", err)
+      console.error('Regeneration error:', err)
     } finally {
       setRegeneratingId(null)
     }

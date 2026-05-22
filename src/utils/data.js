@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
+import { request } from './api'
 
 // Data Management Utilities
 export const createSubject = (name) => ({
@@ -182,104 +183,15 @@ export const calculateScore = (responses, questions) => {
 }
 
 // Groq API Integration
-export const generateQuestionsFromMaterial = async (material, groqApiKey, config) => {
-  if (!groqApiKey) {
-    throw new Error('Groq API key is not configured')
-  }
-
-  const {
-    mcqCount = 10,
-    fitbCount = 5,
-    tfCount = 3,
-    ynCount = 2,
-    difficulty = 'medium'
-  } = config || {}
-
-  const totalRequested = mcqCount + fitbCount + tfCount + ynCount
-
-  const systemPrompt = `You are a university lecturer setting examination questions. Your questions must:
-1. Be derived STRICTLY and ONLY from the provided course material.
-2. Difficulty Level: ${difficulty.toUpperCase()}.
-3. Return ONLY a valid JSON array of objects:
-{
-  "type": "mcq" | "fitb" | "true_false" | "yes_no",
-  "question": "...",
-  "options": ["A", "B", "C", "D"] (only for mcq),
-  "answer": "...",
-  "difficulty": "${difficulty}",
-  "bloomLevel": "..."
-}`
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate exam questions from this material:\n\n${material}` },
-        ],
-        temperature: 0.3,
-        max_tokens: 6000,
-      }),
-    })
-
-    if (response.status === 429) throw new Error('RATE_LIMIT')
-    if (!response.ok) {
-       const errorData = await response.json()
-       throw new Error(errorData.error?.message || 'Failed to generate questions')
-    }
-
-    const data = await response.json()
-    const rawContent = data.choices[0].message.content
-    let content = rawContent
-    const jsonStart = content.indexOf('[')
-    const jsonEnd = content.lastIndexOf(']')
-
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      content = content.substring(jsonStart, jsonEnd + 1)
-    }
-
-    const questions = JSON.parse(content)
-    return questions.map(createQuestion).slice(0, totalRequested)
-  } catch (error) {
-    throw error
-  }
+export const generateQuestionsFromMaterial = async (material, config) => {
+  const payload = { material, config }
+  const response = await request('POST', '/api/groq/questions', payload, true)
+  return response.questions.map(createQuestion)
 }
 
-export const getQuestionExplanation = async (question, material, groqApiKey) => {
-  const prompt = `As an expert academic tutor, explain the answer to this question based on the material provided.
-QUESTION: ${question.question}
-CORRECT ANSWER: ${question.answer}`
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: 'Provide clear, concise explanations.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.5,
-        max_tokens: 500,
-      }),
-    })
-    
-    if (response.status === 429) return 'AI is busy. Please try again later.'
-    const data = await response.json()
-    return data.choices[0].message.content.trim()
-  } catch (error) {
-    return 'Could not retrieve explanation at this time.'
-  }
+export const getQuestionExplanation = async (question, material) => {
+  const response = await request('POST', '/api/groq/explain', { question, material }, true)
+  return response.explanation
 }
 
 // Unit Progression Logic
@@ -332,86 +244,29 @@ export const formatTime = (seconds) => {
   return `${minutes}m ${secs}s`
 }
 
-export const proposeUnitsFromMaterial = async (content, groqApiKey) => {
-  if (!groqApiKey) throw new Error('Groq API key is not configured')
-
-  const systemPrompt = `Analyze Course Material and divide it into Units. Return JSON array: [{ "title": "Unit Title", "material": "..." }]`
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: content.substring(0, 10000) },
-        ],
-        temperature: 0.3,
-        max_tokens: 8000,
-      }),
-    })
-
-    if (response.status === 429) throw new Error('RATE_LIMIT')
-    if (!response.ok) throw new Error('Analysis failed')
-
-    const data = await response.json()
-    const rawContent = data.choices[0].message.content
-    const jsonStart = rawContent.indexOf('[')
-    const jsonEnd = rawContent.lastIndexOf(']')
-    const units = JSON.parse(rawContent.substring(jsonStart, jsonEnd + 1))
-    
-    return units.map((u, index) => ({
-      ...u,
-      id: uuidv4(),
-      questions: [],
-      attempts: [],
-      status: index === 0 ? 'unlocked' : 'locked',
-      bestScore: 0
-    }))
-  } catch (error) {
-    throw error
-  }
+export const proposeUnitsFromMaterial = async (content) => {
+  const response = await request('POST', '/api/groq/units', { content }, true)
+  return response.units.map((u, index) => ({
+    ...u,
+    id: uuidv4(),
+    questions: [],
+    attempts: [],
+    status: index === 0 ? 'unlocked' : 'locked',
+    bestScore: 0,
+  }))
 }
 
-export const transformQuestions = async (questionsList, targetType, groqApiKey) => {
-  if (!groqApiKey) throw new Error('Groq API key is not configured')
+export const transformQuestions = async (questionsList, targetType) => {
+  const response = await request('POST', '/api/groq/transform', { questionsList, targetType }, true)
+  return response.questions
+}
 
-  const systemPrompt = `Transform questions into ${targetType.toUpperCase()}. Return JSON array of objects with originalId, type, question, options (for mcq), answer, explanation.`
+export const extractPracticeQuestions = async (importText) => {
+  const response = await request('POST', '/api/groq/practice/extract', { importText }, true)
+  return response.questions
+}
 
-  const userPrompt = JSON.stringify(questionsList.map(q => ({ id: q.id, text: q.question, answer: q.answer })))
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 4000,
-      }),
-    })
-
-    if (response.status === 429) throw new Error('RATE_LIMIT')
-    if (!response.ok) throw new Error('Transformation failed')
-
-    const data = await response.json()
-    const content = data.choices[0].message.content
-    const jsonStart = content.indexOf('[')
-    const jsonEnd = content.lastIndexOf(']')
-    
-    return JSON.parse(content.substring(jsonStart, jsonEnd + 1))
-  } catch (error) {
-    throw error
-  }
+export const validatePracticeQuestions = async (importText, questions) => {
+  const response = await request('POST', '/api/groq/practice/validate', { importText, questions }, true)
+  return response.questions
 }
