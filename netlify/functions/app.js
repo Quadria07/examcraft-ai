@@ -8,12 +8,22 @@ import { connectToDatabase } from '../../server/config/db.js'
 import User from '../../server/models/User.js'
 
 const app = express()
-app.use(cors({ origin: true }))
+app.use(cors({ origin: true, credentials: true }))
+app.options('*', cors({ origin: true, credentials: true }))
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true')
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*')
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+  next()
+})
 app.use(express.json())
 
 const JWT_SECRET = process.env.JWT_SECRET
 const INVITE_CODE = process.env.REGISTRATION_INVITE_CODE
 const GROQ_API_KEY = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY
+const SECURE_COOKIES = process.env.NODE_ENV !== 'development'
+const COOKIE_SAME_SITE = 'none'
 
 if (!JWT_SECRET) {
   throw new Error('Missing JWT_SECRET environment variable')
@@ -21,6 +31,34 @@ if (!JWT_SECRET) {
 
 if (!GROQ_API_KEY) {
   throw new Error('Missing Groq API key environment variable')
+}
+
+const setAuthCookie = (res, token) => {
+  const cookieParts = [
+    `examcraft_token=${encodeURIComponent(token)}`,
+    'HttpOnly',
+    `Path=/`,
+    `Max-Age=${7 * 24 * 60 * 60}`,
+    `SameSite=${COOKIE_SAME_SITE}`,
+  ]
+  if (SECURE_COOKIES) {
+    cookieParts.push('Secure')
+  }
+  res.setHeader('Set-Cookie', cookieParts.join('; '))
+}
+
+const clearAuthCookie = (res) => {
+  const cookieParts = [
+    'examcraft_token=',
+    'HttpOnly',
+    `Path=/`,
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+    `SameSite=${COOKIE_SAME_SITE}`,
+  ]
+  if (SECURE_COOKIES) {
+    cookieParts.push('Secure')
+  }
+  res.setHeader('Set-Cookie', cookieParts.join('; '))
 }
 
 const parseCookies = (cookieHeader) => {
@@ -130,15 +168,7 @@ app.post('/api/auth/register', async (req, res) => {
   })
 
   const token = createToken(user)
-  const secureCookie = process.env.NODE_ENV === 'production'
-
-  res.cookie('examcraft_token', token, {
-    httpOnly: true,
-    secure: secureCookie,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  })
+  setAuthCookie(res, token)
 
   return res.status(201).json({ user: { email: user.email, data: user.data } })
 })
@@ -161,15 +191,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const token = createToken(user)
-  const secureCookie = process.env.NODE_ENV === 'production'
-
-  res.cookie('examcraft_token', token, {
-    httpOnly: true,
-    secure: secureCookie,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  })
+  setAuthCookie(res, token)
 
   return res.json({ user: { email: user.email, data: user.data } })
 })
@@ -184,14 +206,7 @@ app.get('/api/auth/me', verifyAuth, async (req, res) => {
 })
 
 app.post('/api/auth/logout', verifyAuth, async (req, res) => {
-  const secureCookie = process.env.NODE_ENV === 'production'
-  res.cookie('examcraft_token', '', {
-    httpOnly: true,
-    secure: secureCookie,
-    sameSite: 'lax',
-    path: '/',
-    expires: new Date(0),
-  })
+  clearAuthCookie(res)
   return res.json({ message: 'Logged out' })
 })
 

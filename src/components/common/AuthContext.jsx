@@ -14,7 +14,6 @@ export function AuthProvider({ children }) {
         const data = await api.getCurrentUser()
         setUser(data)
       } catch (err) {
-        api.logout()
         setUser(null)
       } finally {
         setLoading(false)
