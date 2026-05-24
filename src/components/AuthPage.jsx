@@ -36,7 +36,7 @@ export default function AuthPage() {
         <div className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-3xl font-black text-gray-900">ExamCraft AI</h1>
-            <p className="text-sm text-warmGray-500 mt-2">Secure study sync with MongoDB backend and protected AI prompts.</p>
+            <p className="text-sm text-warmGray-500 mt-2">Adaptive exam preparation for students, instructors, and institutions. Practice, assess, and track progress with AI-powered tools.</p>
           </div>
           <div className="rounded-2xl bg-primary/10 p-3">
             <Icons.ShieldCheck className="w-6 h-6 text-primary" />
@@ -103,18 +103,23 @@ export default function AuthPage() {
             disabled={loading}
             className="w-full rounded-2xl bg-primary px-6 py-4 text-sm font-black uppercase tracking-widest text-cream transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Working...' : mode === 'login' ? 'Continue to dashboard' : 'Create secure account'}
+            {loading ? 'Working...' : mode === 'login' ? 'Open your ExamCraft dashboard' : 'Get started with ExamCraft'}
           </button>
         </form>
-
         {mode === 'login' ? (
           <p className="text-[10px] text-warmGray-400 mt-8">
-            New to ExamCraft? <button type="button" onClick={() => setMode('register')} className="font-black text-primary">Register now</button>
+            New to ExamCraft? <button type="button" onClick={() => setMode('register')} className="font-black text-primary">Create account</button>
           </p>
         ) : (
-          <p className="text-[10px] text-warmGray-400 mt-8">
-            Already registered? <button type="button" onClick={() => setMode('login')} className="font-black text-primary">Login instead</button>
-          </p>
+          <>
+            <p className="text-sm text-warmGray-500 mt-6">
+              Need instructor or institutional access? Contact ExamCraft AI to get onboarding and institutional plans: <a href="mailto:support@examcraft.ai" className="font-black text-primary">support@examcraft.ai</a>
+            </p>
+
+            <p className="text-[10px] text-warmGray-400 mt-6">
+              Already registered? <button type="button" onClick={() => setMode('login')} className="font-black text-primary">Login instead</button>
+            </p>
+          </>
         )}
       </div>
     </div>

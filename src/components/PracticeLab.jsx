@@ -349,7 +349,7 @@ export default function PracticeLab({
                          </div>
                          <button onClick={() => deleteVersion(version.id)} className="p-2 text-warmGray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Icons.Trash className="w-5 h-5" /></button>
                       </div>
-                      <button onClick={() => startPractice(version)} className="w-full py-4 bg-cream text-primary rounded-xl font-black uppercase text-[10px] border border-primary/10 hover:bg-primary hover:text-white transition-all">Start Exam</button>
+                      <button onClick={() => startPractice(version)} className="w-full py-4 bg-cream text-primary rounded-xl font-black uppercase text-[10px] border border-primary/10 hover:bg-primary hover:text-white transition-all">Start Practice</button>
                    </div>
                  )
                })}
@@ -390,7 +390,7 @@ export default function PracticeLab({
              <div className="bg-white rounded-3xl p-12 border border-primary/10 text-center shadow-sm relative overflow-hidden">
                 <div className={`absolute top-0 inset-x-0 h-2 ${activePracticeSet.percentage >= 70 ? 'bg-primary' : 'bg-red-500'}`} />
                 <h2 className="text-7xl font-black text-gray-900 tracking-tighter mb-4">{activePracticeSet.percentage}%</h2>
-                <button onClick={() => setSetupStep('manage-questions')} className="px-10 py-4 bg-primary text-cream rounded-xl font-black uppercase text-[10px]">Continue</button>
+                <button onClick={() => setSetupStep('manage-questions')} className="px-10 py-4 bg-primary text-cream rounded-xl font-black uppercase text-[10px]">Return to practice</button>
              </div>
              <div className="bg-white rounded-2xl border border-primary/5 overflow-hidden">
                 <div className="px-8 py-6 border-b border-primary/5 bg-cream/30"><h3 className="text-lg font-black text-gray-900 uppercase">Results Breakdown</h3></div>
@@ -409,7 +409,8 @@ export default function PracticeLab({
                           <p className="font-bold text-gray-900 mb-4">{q.question}</p>
                           {q.sourceQuote && (
                             <div className="mb-4 p-4 bg-amber-50/50 border border-amber-100 rounded-xl italic text-xs text-amber-900/70 line-clamp-3">
-                              "{q.sourceQuote}" — Evidence from source
+                              "{q.sourceQuote}"
+                              <div className="mt-2 text-xs font-medium">Evidence from source</div>
                             </div>
                           )}
                           <div className="grid md:grid-cols-2 gap-6">

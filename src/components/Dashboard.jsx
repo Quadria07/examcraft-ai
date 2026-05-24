@@ -249,7 +249,7 @@ export default function Dashboard({
                 onClick={onPractice}
                 className="w-full py-4 bg-primary text-cream rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity"
               >
-                Practice Lab (AOC)
+                Practice Lab
               </button>
             </div>
           </div>

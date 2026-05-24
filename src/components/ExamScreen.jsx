@@ -264,7 +264,7 @@ export default function ExamScreen({
                   onClick={() => setShowConfirmSubmit(false)}
                   className="w-full px-8 py-4 bg-white text-primary border border-primary/30 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-cream transition-all active:scale-95"
                 >
-                  Continue Reviewing
+                  Resume review
                 </button>
               </div>
             </div>
