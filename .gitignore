@@ -7,3 +7,6 @@ build/
 .env.*.local
 *.log
 .vscode/settings.json
+
+# Local Netlify folder
+.netlify

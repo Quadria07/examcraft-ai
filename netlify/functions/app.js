@@ -8,6 +8,21 @@ import { connectToDatabase } from '../../server/config/db.js'
 import User from '../../server/models/User.js'
 
 const app = express()
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection in Netlify function:', reason)
+})
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception in Netlify function:', error)
+})
+
+console.log('Netlify function starting. Environment availability:', {
+  MONGODB_URI: !!process.env.MONGODB_URI,
+  JWT_SECRET: !!process.env.JWT_SECRET,
+  REGISTRATION_INVITE_CODE: !!process.env.REGISTRATION_INVITE_CODE,
+  GROQ_API_KEY: !!(process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY),
+})
+
 app.use(cors({ origin: true, credentials: true }))
 app.options('*', cors({ origin: true, credentials: true }))
 app.use((req, res, next) => {
@@ -420,6 +435,14 @@ app.post('/api/groq/practice/validate', verifyAuth, async (req, res) => {
 
 app.get('/api/test', (req, res) => {
   res.json({ status: 'ok' })
+})
+
+app.use((err, req, res, next) => {
+  console.error('Express error handler caught an error:', err)
+  if (res.headersSent) {
+    return next(err)
+  }
+  res.status(err.status || 500).json({ message: err.message || 'Internal server error' })
 })
 
 app.use((req, res) => {
