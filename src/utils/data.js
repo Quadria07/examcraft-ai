@@ -27,15 +27,39 @@ export const createUnit = (title) => ({
   bestScore: 0,
 })
 
+const normalizeQuestionType = (rawType) => {
+  const type = String(rawType || '').trim().toLowerCase()
+  if (['mcq', 'multiple_choice', 'multiple choice', 'multiple-choice', 'choice', 'multiplechoice'].includes(type)) return 'mcq'
+  if (['fitb', 'fill_in_blank', 'fill in the blank', 'fill-in-the-blank', 'blank'].includes(type)) return 'fitb'
+  if (['tf', 'true_false', 'true false', 'true/false', 'true-or-false', 'true or false', 'truefalse'].includes(type)) return 'true_false'
+  if (['yn', 'yes_no', 'yes no', 'yes/no', 'yes-or-no', 'yes or no', 'yesno'].includes(type)) return 'yes_no'
+  return 'fitb'
+}
+
+const normalizeOptions = (options) => {
+  if (Array.isArray(options) && options.length > 0) return options.map((opt) => String(opt).trim()).filter(Boolean)
+  return null
+}
+
+const normalizeRawQuestionAnswer = (data) => {
+  return String(data.answer || data.correctAnswer || data.correct_answer || data.answerText || data.response || '').trim()
+}
+
+const normalizeQuestionData = (data) => {
+  return {
+    type: normalizeQuestionType(data.type || data.questionType || data.question_type),
+    question: String(data.question || data.prompt || '').trim(),
+    options: normalizeOptions(data.options || data.choices || data.alternatives || data.answers),
+    answer: normalizeRawQuestionAnswer(data),
+    difficulty: String(data.difficulty || data.bloomLevel || 'medium').trim().toLowerCase() || 'medium',
+    bloomLevel: String(data.bloomLevel || data.bloom_level || 'knowledge').trim().toLowerCase() || 'knowledge',
+    explanation: data.explanation || null,
+  }
+}
+
 export const createQuestion = (data) => ({
   id: uuidv4(),
-  type: data.type, // mcq | fitb | true_false | yes_no
-  question: data.question,
-  options: data.options || null, // only for MCQ
-  answer: data.answer,
-  difficulty: data.difficulty || 'medium', // easy | medium | hard
-  bloomLevel: data.bloomLevel || 'knowledge',
-  explanation: data.explanation || null, // placeholder for tutor
+  ...normalizeQuestionData(data),
 })
 
 export const createAttempt = (difficulty = 'medium') => ({

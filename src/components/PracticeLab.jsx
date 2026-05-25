@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Icons from './common/Icons'
 import { v4 as uuidv4 } from 'uuid'
-import { transformQuestions, evaluateAnswer, extractPracticeQuestions, validatePracticeQuestions } from '../utils/data'
+import { transformQuestions, evaluateAnswer, extractPracticeQuestions, validatePracticeQuestions, createQuestion } from '../utils/data'
 import QuestionCard from './QuestionCard'
 import Timer from './Timer'
 import confetti from 'canvas-confetti'
@@ -91,7 +91,7 @@ export default function PracticeLab({
         id: uuidv4(),
         name: targetType === 'original' ? 'Evidence-Backed Set' : `Verified ${targetType.toUpperCase()}`,
         type: targetType,
-        questions: validated.map(q => ({ id: uuidv4(), ...q }))
+        questions: validated.map((q) => createQuestion(q))
       }
 
       setPracticeLibrary((prev) => prev.map(c => {
@@ -135,7 +135,7 @@ export default function PracticeLab({
         id: uuidv4(),
         name: `${targetType.toUpperCase()} Version`,
         type: targetType,
-        questions: transformed.map(q => ({ id: uuidv4(), ...q, confidence: 90 }))
+        questions: transformed.map((q) => ({ ...createQuestion(q), confidence: q.confidence || 90 }))
       }
 
       setPracticeLibrary((prev) => prev.map(c => {

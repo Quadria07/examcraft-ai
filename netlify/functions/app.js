@@ -296,8 +296,16 @@ app.post('/api/groq/questions', verifyAuth, async (req, res) => {
     return res.status(400).json({ message: 'Material text is required' })
   }
 
-  const systemPrompt = `You are a university lecturer setting examination questions. Your questions must:\n1. Be derived STRICTLY and ONLY from the provided course material.\n2. Difficulty Level: ${config?.difficulty?.toUpperCase() || 'MEDIUM'}.\n3. Return ONLY a valid JSON array of objects with fields: type, question, options, answer, difficulty, bloomLevel.`
-  const userPrompt = `Generate exam questions from this material:\n\n${material}`
+  const mcqCount = Number(config?.mcqCount) || 12
+  const fitbCount = Number(config?.fitbCount) || 6
+  const tfCount = Number(config?.tfCount) || 1
+  const ynCount = Number(config?.ynCount) || 1
+  const totalCount = mcqCount + fitbCount + tfCount + ynCount
+  const difficulty = String(config?.difficulty || 'medium').trim().toUpperCase()
+
+  const systemPrompt = `You are a university lecturer creating exam questions from provided course material. You must only use the material, not invent facts. Return EXACTLY ${totalCount} questions in a JSON array. Use the following question types and counts: ${mcqCount} multiple-choice, ${fitbCount} fill-in-the-blank, ${tfCount} true/false, ${ynCount} yes/no. The response must be ONLY valid JSON with no extra text.`
+
+  const userPrompt = `Create ${mcqCount} multiple-choice questions, ${fitbCount} fill-in-the-blank questions, ${tfCount} true/false questions, and ${ynCount} yes/no questions from this material:\n\n${material}\n\nRequirements:\n- Return only a JSON array of objects.\n- Each object must include: type, question, answer, difficulty, bloomLevel.\n- For MCQ, include options: an array of 4 answer choices. The answer must exactly match the correct option text.\n- For true/false, use type 'true_false' and answer 'True' or 'False'.\n- For yes/no, use type 'yes_no' and answer 'Yes' or 'No'.\n- For fill-in-the-blank, use type 'fitb' and provide the exact missing phrase in answer.\n- Use type values exactly: mcq, fitb, true_false, yes_no.\n- Set difficulty for every question to '${difficulty}'.\n- Do not include commentary or explanation outside the JSON array.`
 
   try {
     const rawContent = await callGroq([
