@@ -164,74 +164,94 @@ const callGroq = async (messages, maxTokens = 5000) => {
 }
 
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, inviteCode } = req.body
-  if (!email || !password || !inviteCode) {
-    return res.status(400).json({ message: 'Email, password, and invite code are required' })
+  try {
+    const { email, password, inviteCode } = req.body
+    if (!email || !password || !inviteCode) {
+      return res.status(400).json({ message: 'Email, password, and invite code are required' })
+    }
+    if (!INVITE_CODE || inviteCode !== INVITE_CODE) {
+      return res.status(403).json({ message: 'Invalid invitation code' })
+    }
+
+    await connectToDatabase()
+    const existing = await User.findOne({ email: email.toLowerCase().trim() })
+    if (existing) {
+      return res.status(409).json({ message: 'Email already registered' })
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12)
+    const user = await User.create({
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      data: {
+        subjects: [],
+        practiceLibrary: [],
+        passMarkPercent: 70,
+        activeExamSession: null,
+        settings: {},
+      },
+    })
+
+    const token = createToken(user)
+    setAuthCookie(res, token)
+
+    return res.status(201).json({ user: { email: user.email, data: user.data } })
+  } catch (error) {
+    console.error('Register error:', error)
+    return res.status(500).json({ message: 'Registration failed due to server error' })
   }
-  if (!INVITE_CODE || inviteCode !== INVITE_CODE) {
-    return res.status(403).json({ message: 'Invalid invitation code' })
-  }
-
-  await connectToDatabase()
-  const existing = await User.findOne({ email: email.toLowerCase().trim() })
-  if (existing) {
-    return res.status(409).json({ message: 'Email already registered' })
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12)
-  const user = await User.create({
-    email: email.toLowerCase().trim(),
-    passwordHash,
-    data: {
-      subjects: [],
-      practiceLibrary: [],
-      passMarkPercent: 70,
-      activeExamSession: null,
-      settings: {},
-    },
-  })
-
-  const token = createToken(user)
-  setAuthCookie(res, token)
-
-  return res.status(201).json({ user: { email: user.email, data: user.data } })
 })
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' })
+  try {
+    const { email, password } = req.body
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' })
+    }
+
+    await connectToDatabase()
+    const user = await User.findOne({ email: email.toLowerCase().trim() })
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' })
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash)
+    if (!isValid) {
+      return res.status(401).json({ message: 'Invalid credentials' })
+    }
+
+    const token = createToken(user)
+    setAuthCookie(res, token)
+
+    return res.json({ user: { email: user.email, data: user.data } })
+  } catch (error) {
+    console.error('Login error:', error)
+    return res.status(500).json({ message: 'Login failed due to server error' })
   }
-
-  await connectToDatabase()
-  const user = await User.findOne({ email: email.toLowerCase().trim() })
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials' })
-  }
-
-  const isValid = await bcrypt.compare(password, user.passwordHash)
-  if (!isValid) {
-    return res.status(401).json({ message: 'Invalid credentials' })
-  }
-
-  const token = createToken(user)
-  setAuthCookie(res, token)
-
-  return res.json({ user: { email: user.email, data: user.data } })
 })
 
 app.get('/api/auth/me', verifyAuth, async (req, res) => {
-  await connectToDatabase()
-  const user = await User.findById(req.userId)
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' })
+  try {
+    await connectToDatabase()
+    const user = await User.findById(req.userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    return res.json({ email: user.email, data: user.data })
+  } catch (error) {
+    console.error('Auth/me error:', error)
+    return res.status(500).json({ message: 'Authentication check failed' })
   }
-  return res.json({ email: user.email, data: user.data })
 })
 
 app.post('/api/auth/logout', verifyAuth, async (req, res) => {
-  clearAuthCookie(res)
-  return res.json({ message: 'Logged out' })
+  try {
+    clearAuthCookie(res)
+    return res.json({ message: 'Logged out' })
+  } catch (error) {
+    console.error('Logout error:', error)
+    return res.status(500).json({ message: 'Logout failed' })
+  }
 })
 
 app.get('/api/session', verifyAuth, async (req, res) => {

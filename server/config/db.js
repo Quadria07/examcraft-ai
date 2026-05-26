@@ -19,8 +19,10 @@ export async function connectToDatabase() {
     cached.promise = mongoose.connect(MONGODB_URI, {
       dbName: 'examcraft',
       autoIndex: true,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 15000,
       socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+      heartbeatFrequencyMS: 10000,
     }).then((mongooseInstance) => mongooseInstance)
       .catch((err) => {
         cached.promise = null
