@@ -270,37 +270,52 @@ app.post('/api/auth/logout', verifyAuth, async (req, res) => {
 })
 
 app.get('/api/session', verifyAuth, async (req, res) => {
-  await connectToDatabase()
-  const user = await User.findById(req.userId)
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' })
+  try {
+    await connectToDatabase()
+    const user = await User.findById(req.userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    return res.json({ session: user.data.activeExamSession || null })
+  } catch (error) {
+    console.error('Get session error:', error)
+    return res.status(500).json({ message: 'Failed to get session' })
   }
-  return res.json({ session: user.data.activeExamSession || null })
 })
 
 app.put('/api/session', verifyAuth, async (req, res) => {
-  const { session } = req.body
-  await connectToDatabase()
-  const user = await User.findById(req.userId)
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' })
-  }
+  try {
+    const { session } = req.body
+    await connectToDatabase()
+    const user = await User.findById(req.userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
 
-  user.data.activeExamSession = session || null
-  await user.save()
-  return res.json({ session: user.data.activeExamSession })
+    user.data.activeExamSession = session || null
+    await user.save()
+    return res.json({ session: user.data.activeExamSession })
+  } catch (error) {
+    console.error('Save session error:', error)
+    return res.status(500).json({ message: 'Failed to save session' })
+  }
 })
 
 app.delete('/api/session', verifyAuth, async (req, res) => {
-  await connectToDatabase()
-  const user = await User.findById(req.userId)
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' })
-  }
+  try {
+    await connectToDatabase()
+    const user = await User.findById(req.userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
 
-  user.data.activeExamSession = null
-  await user.save()
-  return res.json({ session: null })
+    user.data.activeExamSession = null
+    await user.save()
+    return res.json({ session: null })
+  } catch (error) {
+    console.error('Delete session error:', error)
+    return res.status(500).json({ message: 'Failed to clear session' })
+  }
 })
 
 async function migrateUserLegacyData(userId, user) {
