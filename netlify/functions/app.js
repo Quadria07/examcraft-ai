@@ -5,16 +5,31 @@ import serverless from 'serverless-http'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { connectToDatabase } from '../../server/config/db.js'
-import User from '../../server/models/User.js'
-import Subject from '../../server/models/Subject.js'
-import Unit from '../../server/models/Unit.js'
-import Question from '../../server/models/Question.js'
-import Attempt from '../../server/models/Attempt.js'
-import Course from '../../server/models/Course.js'
-import Module from '../../server/models/Module.js'
-import PracticeVersion from '../../server/models/PracticeVersion.js'
-import PracticeQuestion from '../../server/models/PracticeQuestion.js'
-import PracticeAttempt from '../../server/models/PracticeAttempt.js'
+
+// Netlify esbuild bundler wraps ESM default exports, unwrap them
+const unwrap = (m) => (m && m.default ? m.default : m)
+
+import _User from '../../server/models/User.js'
+import _Subject from '../../server/models/Subject.js'
+import _Unit from '../../server/models/Unit.js'
+import _Question from '../../server/models/Question.js'
+import _Attempt from '../../server/models/Attempt.js'
+import _Course from '../../server/models/Course.js'
+import _Module from '../../server/models/Module.js'
+import _PracticeVersion from '../../server/models/PracticeVersion.js'
+import _PracticeQuestion from '../../server/models/PracticeQuestion.js'
+import _PracticeAttempt from '../../server/models/PracticeAttempt.js'
+
+const User = unwrap(_User)
+const Subject = unwrap(_Subject)
+const Unit = unwrap(_Unit)
+const Question = unwrap(_Question)
+const Attempt = unwrap(_Attempt)
+const Course = unwrap(_Course)
+const Module = unwrap(_Module)
+const PracticeVersion = unwrap(_PracticeVersion)
+const PracticeQuestion = unwrap(_PracticeQuestion)
+const PracticeAttempt = unwrap(_PracticeAttempt)
 
 const app = express()
 
