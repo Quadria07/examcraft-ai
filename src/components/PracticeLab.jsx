@@ -30,6 +30,8 @@ export default function PracticeLab({
   const [timerEnabled, setTimerEnabled] = useState(true)
   const [timerDuration, setTimerDuration] = useState(30)
   const [timeLeft, setTimeLeft] = useState(null)
+  const [configuringVersion, setConfiguringVersion] = useState(null)
+  const [expandedHistoryVersionId, setExpandedHistoryVersionId] = useState(null)
   
   const [notification, setNotification] = useState(null)
   const [editingQuestion, setEditingQuestion] = useState(null)
@@ -87,11 +89,17 @@ export default function PracticeLab({
       setImportStage('Strict Validation...')
       const validated = await validatePracticeQuestions(importText, parsed)
 
+      let finalQuestions = validated
+      if (targetType !== 'original') {
+        setImportStage('Generating New Styles...')
+        finalQuestions = await transformQuestions(validated, targetType)
+      }
+
       const newVersion = {
         id: uuidv4(),
         name: targetType === 'original' ? 'Evidence-Backed Set' : `Verified ${targetType.toUpperCase()}`,
         type: targetType,
-        questions: validated.map((q) => createQuestion(q))
+        questions: finalQuestions.map((q) => createQuestion(q))
       }
 
       setPracticeLibrary((prev) => prev.map(c => {
@@ -111,7 +119,7 @@ export default function PracticeLab({
       
       setImportText(''); notify('Practice set saved successfully!')
     } catch (error) {
-      if (error.message === 'RATE_LIMIT') {
+      if (error.status === 429 || error.message?.includes('rate limit') || error.message === 'RATE_LIMIT') {
         notify('AI is busy (Rate Limit). Please wait 60 seconds and try again.', 'error')
       } else {
         notify('Import failed. Please check your internet.', 'error')
@@ -155,7 +163,7 @@ export default function PracticeLab({
       
       notify(`${targetType.toUpperCase()} version created!`)
     } catch (error) {
-      if (error.message === 'RATE_LIMIT') {
+      if (error.status === 429 || error.message?.includes('rate limit') || error.message === 'RATE_LIMIT') {
         notify('AI is busy (Rate Limit). Please wait 60 seconds and try again.', 'error')
       } else {
         notify('Generation failed.', 'error')
@@ -165,7 +173,9 @@ export default function PracticeLab({
     }
   }
 
-  const startPractice = (version) => {
+  const startPractice = (version, duration, enabled) => {
+    setTimerEnabled(enabled)
+    setTimerDuration(duration)
     setActivePracticeSet({
       id: version.id,
       name: version.name,
@@ -174,7 +184,11 @@ export default function PracticeLab({
       responses: {},
       startTime: Date.now()
     })
-    if (timerEnabled) setTimeLeft(timerDuration * 60)
+    if (enabled) {
+      setTimeLeft(duration * 60)
+    } else {
+      setTimeLeft(null)
+    }
     setSetupStep('practice')
   }
 
@@ -184,7 +198,45 @@ export default function PracticeLab({
       if (evaluateAnswer(activePracticeSet.responses[q.id] || '', q.answer, q.type, q.options)) score++
     })
     const percentage = Math.round((score / activePracticeSet.questions.length) * 100)
-    setActivePracticeSet({ ...activePracticeSet, score, percentage, endTime: Date.now() })
+    const endTime = Date.now()
+
+    const newAttempt = {
+      id: uuidv4(),
+      score,
+      percentage,
+      responses: activePracticeSet.responses,
+      startTime: activePracticeSet.startTime,
+      endTime
+    }
+
+    setActivePracticeSet({ ...activePracticeSet, score, percentage, endTime })
+
+    setPracticeLibrary((prev) => prev.map(c => {
+      if (c.id === selectedCourseId) {
+        return {
+          ...c,
+          modules: (c.modules || []).map(m => {
+            if (m.id === selectedModuleId) {
+              return {
+                ...m,
+                versions: (m.versions || []).map(v => {
+                  if (v.id === activePracticeSet.id) {
+                    return {
+                      ...v,
+                      attempts: [...(v.attempts || []), newAttempt]
+                    }
+                  }
+                  return v
+                })
+              }
+            }
+            return m
+          })
+        }
+      }
+      return c
+    }))
+
     if (percentage >= 70) confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
     setSetupStep('results')
   }
@@ -340,16 +392,69 @@ export default function PracticeLab({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                {(selectedModule?.versions || []).map((version) => {
                  const avgConf = Math.round(version.questions.reduce((a,q) => a + (q.confidence || 100), 0) / version.questions.length)
+                 const hasAttempts = version.attempts && version.attempts.length > 0
+                 const bestScore = hasAttempts ? Math.max(...version.attempts.map(a => a.percentage)) : 0
                  return (
-                   <div key={version.id} className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm group">
+                   <div key={version.id} className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm group transition-all duration-300 hover:shadow-md">
                       <div className="flex justify-between items-start mb-6">
                          <div>
-                            <span className={`px-2 py-1 rounded text-[8px] font-black uppercase mb-2 inline-block ${getConfidenceColor(avgConf)}`}>{avgConf}% AI Confidence</span>
-                            <h4 className="text-xl font-black text-gray-900">{version.name}</h4>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                               <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase inline-block ${getConfidenceColor(avgConf)}`}>{avgConf}% AI Confidence</span>
+                               {hasAttempts && (
+                                  <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase inline-block bg-tertiary/10 text-tertiary">
+                                     Best: {bestScore}%
+                                  </span>
+                               )}
+                            </div>
+                            <h4 className="text-xl font-black text-gray-900 leading-tight">{version.name}</h4>
+                            <p className="text-[10px] text-warmGray-400 font-bold mt-1 uppercase tracking-wider">
+                              {version.questions.length} Questions {hasAttempts ? `• ${version.attempts.length} Attempt${version.attempts.length > 1 ? 's' : ''}` : ''}
+                            </p>
                          </div>
                          <button onClick={() => deleteVersion(version.id)} className="p-2 text-warmGray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Icons.Trash className="w-5 h-5" /></button>
                       </div>
-                      <button onClick={() => startPractice(version)} className="w-full py-4 bg-cream text-primary rounded-xl font-black uppercase text-[10px] border border-primary/10 hover:bg-primary hover:text-white transition-all">Start Practice</button>
+                      <button onClick={() => setConfiguringVersion(version)} className="w-full py-4 bg-cream text-primary rounded-xl font-black uppercase text-[10px] border border-primary/10 hover:bg-primary hover:text-white transition-all">Start Practice</button>
+                      
+                      {hasAttempts && (
+                        <div className="mt-6 pt-4 border-t border-primary/5">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedHistoryVersionId(expandedHistoryVersionId === version.id ? null : version.id)}
+                            className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-wider text-warmGray-400 hover:text-primary transition-all"
+                          >
+                            <span>Attempt History ({version.attempts.length})</span>
+                            <Icons.ChevronLeft className={`w-4 h-4 transform transition-transform duration-200 ${expandedHistoryVersionId === version.id ? '-rotate-90 text-primary' : 'text-warmGray-400'}`} />
+                          </button>
+                          
+                          {expandedHistoryVersionId === version.id && (
+                            <div className="mt-4 space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                              {version.attempts.map((attempt, index) => {
+                                const durationSeconds = Math.round((new Date(attempt.endTime) - new Date(attempt.startTime)) / 1000)
+                                const durationMins = Math.floor(durationSeconds / 60)
+                                const durationSecs = durationSeconds % 60
+                                return (
+                                  <div key={attempt.id || index} className="flex items-center justify-between p-3 bg-cream/35 border border-primary/5 rounded-2xl text-[10px] transition-all hover:bg-cream/50">
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-gray-900">Run #{version.attempts.length - index}</span>
+                                      <span className="text-[8px] text-warmGray-400 font-black uppercase tracking-widest mt-0.5">
+                                        {new Date(attempt.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-[9px] text-warmGray-400 font-black uppercase tracking-wider">
+                                        {durationMins > 0 ? `${durationMins}m ` : ''}{durationSecs}s
+                                      </span>
+                                      <span className={`px-3 py-1.5 rounded-xl font-black text-[10px] text-white shadow-sm ${attempt.percentage >= 70 ? 'bg-primary' : 'bg-red-500'}`}>
+                                        {attempt.percentage}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                    </div>
                  )
                })}
@@ -482,6 +587,93 @@ export default function PracticeLab({
             <h3 className="text-2xl font-black text-gray-900 uppercase mb-8">New Module</h3>
             <input type="text" autoFocus value={newModuleName} onChange={e => setNewModuleName(e.target.value)} placeholder="Module Name" className="w-full px-6 py-4 bg-cream border border-primary/10 rounded-xl mb-6 font-bold text-center" onKeyPress={e => e.key === 'Enter' && handleAddModule()} />
             <div className="flex gap-3"><button onClick={handleAddModule} className="flex-1 py-4 bg-primary text-cream rounded-xl font-black text-[10px]">Add Module</button><button onClick={() => setShowAddModule(false)} className="flex-1 py-4 bg-white text-warmGray-400 border border-primary/10 rounded-xl font-black text-[10px]">Cancel</button></div>
+          </div>
+        </div>
+      )}
+
+      {configuringVersion && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md">
+          <div className="w-full max-w-md bg-white rounded-3xl p-10 shadow-2xl text-center border border-primary/5 animation-slide-up">
+            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-primary">
+              <Icons.Clock className="w-8 h-8" />
+            </div>
+            
+            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter mb-2">Configure Session</h3>
+            <p className="text-[10px] text-warmGray-400 font-bold uppercase tracking-wider mb-6">{configuringVersion.name}</p>
+            
+            <div className="space-y-6 text-left mb-8">
+              {/* Timer Toggle */}
+              <div className="flex items-center justify-between p-4 bg-cream/35 border border-primary/5 rounded-2xl">
+                <div>
+                  <span className="text-xs font-black uppercase text-gray-900 block">Enable Timer</span>
+                  <span className="text-[9px] text-warmGray-400 font-black uppercase tracking-wider block">Limit your practice time</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTimerEnabled(!timerEnabled)}
+                  className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${timerEnabled ? 'bg-primary' : 'bg-warmGray-200'}`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-md transform duration-200 ${timerEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              {/* Timer Duration selection */}
+              {timerEnabled && (
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-warmGray-400 uppercase tracking-widest block">Session Duration</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[5, 15, 30, 60].map((mins) => (
+                      <button
+                        key={mins}
+                        onClick={() => setTimerDuration(mins)}
+                        type="button"
+                        className={`py-3 rounded-xl font-black text-xs transition-all border ${
+                          timerDuration === mins
+                            ? 'bg-primary text-cream border-primary shadow-sm shadow-primary/15'
+                            : 'bg-cream/20 text-warmGray-500 border-primary/5 hover:border-primary/20'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Custom minutes input */}
+                  <div className="flex items-center gap-3 mt-3 bg-cream/30 border border-primary/5 p-4 rounded-xl">
+                    <span className="text-xs font-bold text-warmGray-400 uppercase">Custom:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="180"
+                      value={timerDuration}
+                      onChange={(e) => setTimerDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full bg-transparent border-b border-primary/10 text-right font-black text-sm text-gray-900 focus:outline-none focus:border-primary"
+                    />
+                    <span className="text-xs font-black text-warmGray-400 uppercase">Min</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  startPractice(configuringVersion, timerDuration, timerEnabled)
+                  setConfiguringVersion(null)
+                }}
+                className="flex-1 py-4 bg-primary text-cream rounded-xl font-black uppercase text-[10px] shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
+              >
+                Start Practice
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfiguringVersion(null)}
+                className="flex-1 py-4 bg-white text-warmGray-400 border border-primary/10 rounded-xl font-black uppercase text-[10px] hover:bg-cream/20 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

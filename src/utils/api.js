@@ -91,3 +91,7 @@ export const saveExamSession = async (session) => {
 export const clearExamSession = async () => {
   return request('DELETE', '/api/session', undefined, true)
 }
+
+export const wipeAllData = async () => {
+  return request('DELETE', '/api/data', undefined, true)
+}

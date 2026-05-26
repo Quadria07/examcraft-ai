@@ -8,7 +8,7 @@ import Settings from './components/Settings'
 import PracticeLab from './components/PracticeLab'
 import AuthPage from './components/AuthPage'
 import { useAuth } from './components/common/AuthContext'
-import { fetchAppData, saveAppData } from './utils/api'
+import { fetchAppData, saveAppData, wipeAllData } from './utils/api'
 import { createSubject } from './utils/data'
 import Icons from './components/common/Icons'
 
@@ -172,11 +172,20 @@ export default function App() {
     setShowResumeDialog(false)
   }
 
-  const handleClearAllData = () => {
-    setSubjects([])
-    setPracticeLibrary([])
-    setPassMarkPercent(70)
-    setScreen('dashboard')
+  const handleClearAllData = async () => {
+    try {
+      setSaveStatus('saving')
+      await wipeAllData()
+      setSubjects([])
+      setPracticeLibrary([])
+      setPassMarkPercent(70)
+      setSaveStatus('saved')
+      setScreen('dashboard')
+    } catch (err) {
+      console.error('Failed to wipe data:', err)
+      setSaveStatus('error')
+      alert('Failed to wipe system data: ' + err.message)
+    }
   }
 
   return (

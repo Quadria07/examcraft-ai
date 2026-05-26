@@ -6,6 +6,15 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { connectToDatabase } from '../../server/config/db.js'
 import User from '../../server/models/User.js'
+import Subject from '../../server/models/Subject.js'
+import Unit from '../../server/models/Unit.js'
+import Question from '../../server/models/Question.js'
+import Attempt from '../../server/models/Attempt.js'
+import Course from '../../server/models/Course.js'
+import Module from '../../server/models/Module.js'
+import PracticeVersion from '../../server/models/PracticeVersion.js'
+import PracticeQuestion from '../../server/models/PracticeQuestion.js'
+import PracticeAttempt from '../../server/models/PracticeAttempt.js'
 
 const app = express()
 
@@ -259,35 +268,443 @@ app.delete('/api/session', verifyAuth, async (req, res) => {
   return res.json({ session: null })
 })
 
-app.get('/api/data', verifyAuth, async (req, res) => {
-  await connectToDatabase()
-  const user = await User.findById(req.userId)
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' })
+async function migrateUserLegacyData(userId, user) {
+  const subjectsCount = await Subject.countDocuments({ userId })
+  const coursesCount = await Course.countDocuments({ userId })
+  
+  let migrated = false
+
+  if (subjectsCount === 0 && user.data?.subjects?.length > 0) {
+    console.log(`[Lazy Migration] Migrating subjects for user ${userId}...`)
+    migrated = true
+    for (const s of user.data.subjects) {
+      await Subject.updateOne({ id: s.id }, { name: s.name, userId }, { upsert: true })
+      
+      if (Array.isArray(s.units)) {
+        for (const u of s.units) {
+          await Unit.updateOne({ id: u.id }, {
+            title: u.title,
+            material: u.material || '',
+            status: u.status || 'locked',
+            bestScore: u.bestScore,
+            subjectId: s.id
+          }, { upsert: true })
+          
+          if (Array.isArray(u.questions)) {
+            for (const q of u.questions) {
+              await Question.updateOne({ id: q.id }, {
+                type: q.type,
+                question: q.question,
+                options: q.options,
+                answer: q.answer,
+                difficulty: q.difficulty || 'medium',
+                bloomLevel: q.bloomLevel || 'Remember',
+                explanation: q.explanation || '',
+                unitId: u.id
+              }, { upsert: true })
+            }
+          }
+          
+          if (Array.isArray(u.attempts)) {
+            for (const a of u.attempts) {
+              await Attempt.updateOne({ id: a.id }, {
+                timestamp: a.timestamp,
+                responses: a.responses || {},
+                flagged: a.flagged || {},
+                score: a.score,
+                percentage: a.percentage,
+                completed: a.completed !== false,
+                timeTaken: a.timeTaken || 0,
+                difficulty: a.difficulty || 'medium',
+                userId,
+                unitId: u.id
+              }, { upsert: true })
+            }
+          }
+        }
+      }
+    }
   }
-  return res.json({ data: user.data })
+  
+  if (coursesCount === 0 && user.data?.practiceLibrary?.length > 0) {
+    console.log(`[Lazy Migration] Migrating practice library for user ${userId}...`)
+    migrated = true
+    for (const c of user.data.practiceLibrary) {
+      await Course.updateOne({ id: c.id }, { name: c.name, userId }, { upsert: true })
+      
+      if (Array.isArray(c.modules)) {
+        for (const m of c.modules) {
+          await Module.updateOne({ id: m.id }, { name: m.name, courseId: c.id }, { upsert: true })
+          
+          if (Array.isArray(m.versions)) {
+            for (const v of m.versions) {
+              await PracticeVersion.updateOne({ id: v.id }, { name: v.name, type: v.type, moduleId: m.id }, { upsert: true })
+              
+              if (Array.isArray(v.questions)) {
+                for (const q of v.questions) {
+                  await PracticeQuestion.updateOne({ id: q.id }, {
+                    type: q.type,
+                    question: q.question,
+                    options: q.options,
+                    answer: q.answer,
+                    explanation: q.explanation || '',
+                    sourceQuote: q.sourceQuote || '',
+                    confidence: q.confidence ?? 1.0,
+                    versionId: v.id
+                  }, { upsert: true })
+                }
+              }
+              
+              if (Array.isArray(v.attempts)) {
+                for (const a of v.attempts) {
+                  await PracticeAttempt.updateOne({ id: a.id }, {
+                    score: a.score,
+                    percentage: a.percentage,
+                    responses: a.responses || {},
+                    startTime: a.startTime,
+                    endTime: a.endTime,
+                    userId,
+                    versionId: v.id
+                  }, { upsert: true })
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  if (migrated) {
+    user.data.subjects = []
+    user.data.practiceLibrary = []
+    user.markModified('data')
+    await user.save()
+    console.log(`[Lazy Migration] Migration completed and legacy data cleared for user ${userId}.`)
+  }
+}
+
+async function assembleUserAppData(userId, user) {
+  await migrateUserLegacyData(userId, user)
+  
+  const subjectsList = await Subject.find({ userId }).lean()
+  const populatedSubjects = []
+  
+  for (const s of subjectsList) {
+    const units = await Unit.find({ subjectId: s.id }).lean()
+    const populatedUnits = []
+    
+    for (const u of units) {
+      const questions = await Question.find({ unitId: u.id }).lean()
+      const attempts = await Attempt.find({ unitId: u.id }).lean()
+      populatedUnits.push({
+        ...u,
+        questions: questions.map(q => ({ ...q, id: q.id, _id: undefined, __v: undefined })),
+        attempts: attempts.map(a => ({ ...a, id: a.id, _id: undefined, __v: undefined }))
+      })
+    }
+    populatedSubjects.push({
+      ...s,
+      _id: undefined,
+      __v: undefined,
+      units: populatedUnits
+    })
+  }
+  
+  const coursesList = await Course.find({ userId }).lean()
+  const populatedCourses = []
+  
+  for (const c of coursesList) {
+    const modules = await Module.find({ courseId: c.id }).lean()
+    const populatedModules = []
+    
+    for (const m of modules) {
+      const versions = await PracticeVersion.find({ moduleId: m.id }).lean()
+      const populatedVersions = []
+      
+      for (const v of versions) {
+        const questions = await PracticeQuestion.find({ versionId: v.id }).lean()
+        const attempts = await PracticeAttempt.find({ versionId: v.id }).lean()
+        populatedVersions.push({
+          ...v,
+          questions: questions.map(q => ({ ...q, id: q.id, _id: undefined, __v: undefined })),
+          attempts: attempts.map(a => ({ ...a, id: a.id, _id: undefined, __v: undefined }))
+        })
+      }
+      populatedModules.push({
+        ...m,
+        _id: undefined,
+        __v: undefined,
+        versions: populatedVersions
+      })
+    }
+    populatedCourses.push({
+      ...c,
+      _id: undefined,
+      __v: undefined,
+      modules: populatedModules
+    })
+  }
+  
+  return {
+    subjects: populatedSubjects,
+    practiceLibrary: populatedCourses,
+    passMarkPercent: user.data?.passMarkPercent ?? 70,
+    activeExamSession: user.data?.activeExamSession ?? null,
+    settings: user.data?.settings ?? {}
+  }
+}
+
+async function saveUserAppData(userId, user, { subjects, practiceLibrary, passMarkPercent }) {
+  if (typeof passMarkPercent === 'number') {
+    user.data.passMarkPercent = passMarkPercent
+    user.markModified('data')
+    await user.save()
+  }
+  
+  if (Array.isArray(subjects)) {
+    const payloadSubjectIds = subjects.map(s => s.id)
+    await Subject.deleteMany({ userId, id: { $nin: payloadSubjectIds } })
+    
+    for (const s of subjects) {
+      await Subject.updateOne({ userId, id: s.id }, { name: s.name }, { upsert: true })
+      
+      if (Array.isArray(s.units)) {
+        const payloadUnitIds = s.units.map(u => u.id)
+        await Unit.deleteMany({ subjectId: s.id, id: { $nin: payloadUnitIds } })
+        
+        for (const u of s.units) {
+          await Unit.updateOne({ id: u.id }, {
+            title: u.title,
+            material: u.material || '',
+            status: u.status || 'locked',
+            bestScore: u.bestScore,
+            subjectId: s.id
+          }, { upsert: true })
+          
+          if (Array.isArray(u.questions)) {
+            const payloadQIds = u.questions.map(q => q.id)
+            await Question.deleteMany({ unitId: u.id, id: { $nin: payloadQIds } })
+            
+            for (const q of u.questions) {
+              await Question.updateOne({ id: q.id }, {
+                type: q.type,
+                question: q.question,
+                options: q.options,
+                answer: q.answer,
+                difficulty: q.difficulty || 'medium',
+                bloomLevel: q.bloomLevel || 'Remember',
+                explanation: q.explanation || '',
+                unitId: u.id
+              }, { upsert: true })
+            }
+          } else {
+            await Question.deleteMany({ unitId: u.id })
+          }
+          
+          if (Array.isArray(u.attempts)) {
+            const payloadAttemptIds = u.attempts.map(a => a.id)
+            await Attempt.deleteMany({ unitId: u.id, id: { $nin: payloadAttemptIds } })
+            
+            for (const a of u.attempts) {
+              await Attempt.updateOne({ id: a.id }, {
+                timestamp: a.timestamp,
+                responses: a.responses || {},
+                flagged: a.flagged || {},
+                score: a.score,
+                percentage: a.percentage,
+                completed: a.completed !== false,
+                timeTaken: a.timeTaken || 0,
+                difficulty: a.difficulty || 'medium',
+                userId,
+                unitId: u.id
+              }, { upsert: true })
+            }
+          } else {
+            await Attempt.deleteMany({ unitId: u.id })
+          }
+        }
+      } else {
+        await Unit.deleteMany({ subjectId: s.id })
+      }
+    }
+
+    const activeSubjects = await Subject.find({ userId }).lean()
+    const activeSubjectIds = activeSubjects.map(s => s.id)
+    await Unit.deleteMany({ subjectId: { $nin: activeSubjectIds } })
+
+    const activeUnits = await Unit.find({ subjectId: { $in: activeSubjectIds } }).lean()
+    const activeUnitIds = activeUnits.map(u => u.id)
+    await Question.deleteMany({ unitId: { $nin: activeUnitIds } })
+    await Attempt.deleteMany({ userId, unitId: { $nin: activeUnitIds } })
+  }
+  
+  if (Array.isArray(practiceLibrary)) {
+    const payloadCourseIds = practiceLibrary.map(c => c.id)
+    await Course.deleteMany({ userId, id: { $nin: payloadCourseIds } })
+    
+    for (const c of practiceLibrary) {
+      await Course.updateOne({ userId, id: c.id }, { name: c.name }, { upsert: true })
+      
+      if (Array.isArray(c.modules)) {
+        const payloadModuleIds = c.modules.map(m => m.id)
+        await Module.deleteMany({ courseId: c.id, id: { $nin: payloadModuleIds } })
+        
+        for (const m of c.modules) {
+          await Module.updateOne({ id: m.id }, { name: m.name, courseId: c.id }, { upsert: true })
+          
+          if (Array.isArray(m.versions)) {
+            const payloadVersionIds = m.versions.map(v => v.id)
+            await PracticeVersion.deleteMany({ moduleId: m.id, id: { $nin: payloadVersionIds } })
+            
+            for (const v of m.versions) {
+              await PracticeVersion.updateOne({ id: v.id }, { name: v.name, type: v.type, moduleId: m.id }, { upsert: true })
+              
+              if (Array.isArray(v.questions)) {
+                const payloadQIds = v.questions.map(q => q.id)
+                await PracticeQuestion.deleteMany({ versionId: v.id, id: { $nin: payloadQIds } })
+                
+                for (const q of v.questions) {
+                  await PracticeQuestion.updateOne({ id: q.id }, {
+                    type: q.type,
+                    question: q.question,
+                    options: q.options,
+                    answer: q.answer,
+                    explanation: q.explanation || '',
+                    sourceQuote: q.sourceQuote || '',
+                    confidence: q.confidence ?? 1.0,
+                    versionId: v.id
+                  }, { upsert: true })
+                }
+              } else {
+                await PracticeQuestion.deleteMany({ versionId: v.id })
+              }
+              
+              if (Array.isArray(v.attempts)) {
+                const payloadAttemptIds = v.attempts.map(a => a.id)
+                await PracticeAttempt.deleteMany({ versionId: v.id, id: { $nin: payloadAttemptIds } })
+                
+                for (const a of v.attempts) {
+                  await PracticeAttempt.updateOne({ id: a.id }, {
+                    score: a.score,
+                    percentage: a.percentage,
+                    responses: a.responses || {},
+                    startTime: a.startTime,
+                    endTime: a.endTime,
+                    userId,
+                    versionId: v.id
+                  }, { upsert: true })
+                }
+              } else {
+                await PracticeAttempt.deleteMany({ versionId: v.id })
+              }
+            }
+          } else {
+            await PracticeVersion.deleteMany({ moduleId: m.id })
+          }
+        }
+      } else {
+        await Module.deleteMany({ courseId: c.id })
+      }
+    }
+
+    const activeCourses = await Course.find({ userId }).lean()
+    const activeCourseIds = activeCourses.map(c => c.id)
+    await Module.deleteMany({ courseId: { $nin: activeCourseIds } })
+
+    const activeModules = await Module.find({ courseId: { $in: activeCourseIds } }).lean()
+    const activeModuleIds = activeModules.map(m => m.id)
+    await PracticeVersion.deleteMany({ moduleId: { $nin: activeModuleIds } })
+
+    const activeVersions = await PracticeVersion.find({ moduleId: { $in: activeModuleIds } }).lean()
+    const activeVersionIds = activeVersions.map(v => v.id)
+    await PracticeQuestion.deleteMany({ versionId: { $nin: activeVersionIds } })
+    await PracticeAttempt.deleteMany({ userId, versionId: { $nin: activeVersionIds } })
+  }
+}
+
+app.get('/api/data', verifyAuth, async (req, res) => {
+  try {
+    await connectToDatabase()
+    const user = await User.findById(req.userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    
+    const assembledData = await assembleUserAppData(req.userId, user)
+    return res.json({ data: assembledData })
+  } catch (error) {
+    console.error('Failed to get user data:', error)
+    return res.status(500).json({ message: 'Failed to load library' })
+  }
 })
 
 app.put('/api/data', verifyAuth, async (req, res) => {
-  const { subjects, practiceLibrary, passMarkPercent } = req.body
-  await connectToDatabase()
-  const user = await User.findById(req.userId)
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' })
-  }
+  try {
+    const { subjects, practiceLibrary, passMarkPercent } = req.body
+    await connectToDatabase()
+    const user = await User.findById(req.userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
 
-  if (Array.isArray(subjects)) {
-    user.data.subjects = subjects
+    await saveUserAppData(req.userId, user, { subjects, practiceLibrary, passMarkPercent })
+    const updatedData = await assembleUserAppData(req.userId, user)
+    return res.json({ data: updatedData })
+  } catch (error) {
+    console.error('Failed to save user data:', error)
+    return res.status(500).json({ message: 'Failed to save progress' })
   }
-  if (Array.isArray(practiceLibrary)) {
-    user.data.practiceLibrary = practiceLibrary
-  }
-  if (typeof passMarkPercent === 'number') {
-    user.data.passMarkPercent = passMarkPercent
-  }
+})
 
-  await user.save()
-  return res.json({ data: user.data })
+app.delete('/api/data', verifyAuth, async (req, res) => {
+  try {
+    await connectToDatabase()
+    const userId = req.userId
+    
+    const userSubjects = await Subject.find({ userId }).select('id')
+    const userSubjectIds = userSubjects.map(s => s.id)
+    await Unit.deleteMany({ subjectId: { $in: userSubjectIds } })
+    
+    const userUnitsList = await Unit.find({ subjectId: { $in: userSubjectIds } }).select('id')
+    const userUnitIds = userUnitsList.map(u => u.id)
+    await Question.deleteMany({ unitId: { $in: userUnitIds } })
+    
+    const userCourses = await Course.find({ userId }).select('id')
+    const userCourseIds = userCourses.map(c => c.id)
+    await Module.deleteMany({ courseId: { $in: userCourseIds } })
+    
+    const userModules = await Module.find({ courseId: { $in: userCourseIds } }).select('id')
+    const userModuleIds = userModules.map(m => m.id)
+    await PracticeVersion.deleteMany({ moduleId: { $in: userModuleIds } })
+    
+    const userVersions = await PracticeVersion.find({ moduleId: { $in: userModuleIds } }).select('id')
+    const userVersionIds = userVersions.map(v => v.id)
+    await PracticeQuestion.deleteMany({ versionId: { $in: userVersionIds } })
+    
+    await Subject.deleteMany({ userId })
+    await Course.deleteMany({ userId })
+    await Attempt.deleteMany({ userId })
+    await PracticeAttempt.deleteMany({ userId })
+
+    const user = await User.findById(userId)
+    if (user) {
+      user.data = {
+        subjects: [],
+        practiceLibrary: [],
+        passMarkPercent: 70,
+        activeExamSession: null,
+        settings: {}
+      }
+      user.markModified('data')
+      await user.save()
+    }
+
+    return res.json({ message: 'All system data wiped successfully' })
+  } catch (error) {
+    console.error('Failed to wipe user data:', error)
+    return res.status(500).json({ message: 'Failed to wipe system data' })
+  }
 })
 
 app.post('/api/groq/questions', verifyAuth, async (req, res) => {
@@ -375,12 +792,39 @@ app.post('/api/groq/transform', verifyAuth, async (req, res) => {
     return res.status(400).json({ message: 'Questions and target type are required' })
   }
 
-  const prompt = `Transform questions into ${targetType.toUpperCase()}. Return a JSON array of objects with originalId, type, question, options, answer, explanation.`
+  let typeDetails = ''
+  if (targetType === 'mcq') {
+    typeDetails = 'Convert every question into a Multiple-Choice Question (MCQ). You MUST provide an "options" array with exactly 4 options, and the "answer" MUST be the exact text of one of those options. The "type" field MUST be "mcq".'
+  } else if (targetType === 'fitb') {
+    typeDetails = 'Convert every question into a Fill-in-the-Blank (FITB) question. The question text should contain a blank space (like "___"). The "answer" MUST be the exact word or phrase that completes the blank. The "options" array MUST be null. The "type" field MUST be "fitb".'
+  } else if (targetType === 'true_false') {
+    typeDetails = 'Convert every question into a True/False question. The question should be a statement that is either True or False. The "options" array MUST be ["True", "False"]. The "answer" MUST be exactly either "True" or "False". The "type" field MUST be "true_false".'
+  } else if (targetType === 'yes_no') {
+    typeDetails = 'Convert every question into a Yes/No question. The question should be a direct question requiring a Yes/No. The "options" array MUST be ["Yes", "No"]. The "answer" MUST be exactly either "Yes" or "No". The "type" field MUST be "yes_no".'
+  }
+
+  const prompt = `You are a professional educational assessment engine.
+Your task is to transform all provided questions into the target format: ${targetType.toUpperCase()}.
+Here are the specific requirements for this format:
+${typeDetails}
+
+Return ONLY a valid JSON array of objects. Each object in the array MUST have the following structure:
+{
+  "originalId": "the ID of the original question from the input",
+  "type": "${targetType}",
+  "question": "the transformed question text",
+  "options": [4 strings for mcq, ["True", "False"] for true_false, ["Yes", "No"] for yes_no, null for fitb],
+  "answer": "the correct answer string (must match one of the options exactly for mcq/true_false/yes_no)",
+  "explanation": "a short explanation of why the answer is correct",
+  "sourceQuote": "the exact sourceQuote from the input question, preserved exactly"
+}
+
+Do not include any pre-text, post-text, or explanations outside the JSON array.`
 
   try {
     const rawContent = await callGroq([
       { role: 'system', content: prompt },
-      { role: 'user', content: JSON.stringify(questionsList.map((q) => ({ id: q.id, text: q.question, answer: q.answer }))) },
+      { role: 'user', content: JSON.stringify(questionsList.map((q) => ({ id: q.id, text: q.question, answer: q.answer, sourceQuote: q.sourceQuote }))) },
     ], 4000)
 
     const transformed = safeJsonArray(rawContent)
