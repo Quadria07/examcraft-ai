@@ -1,6 +1,14 @@
 [build]
   functions = "netlify/functions"
 
+[functions]
+  # Increase timeout to the maximum allowed on Netlify free tier (26 seconds)
+  # Needed for large saves that do many sequential MongoDB operations
+  node_bundler = "esbuild"
+
+[functions."app"]
+  timeout = 26
+
 # Redirect API requests to the Netlify function and keep SPA routing for other paths
 [[redirects]]
   from = "/api/*"
