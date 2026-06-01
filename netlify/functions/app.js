@@ -56,7 +56,9 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   next()
 })
-app.use(express.json())
+// Increase body limit to 5 MB — course material + questions can be large
+app.use(express.json({ limit: '5mb' }))
+app.use(express.urlencoded({ limit: '5mb', extended: true }))
 
 const JWT_SECRET = process.env.JWT_SECRET
 const INVITE_CODE = process.env.REGISTRATION_INVITE_CODE
@@ -152,10 +154,10 @@ const safeJsonArray = (text) => {
 // If a model returns 429 (rate limited), the next model in the list is tried automatically.
 // Models are ordered by quality first, then by daily token limit as a tiebreaker.
 const GROQ_MODELS = [
-  { id: 'llama-3.3-70b-versatile',  label: 'Llama 3.3 70B'   }, // Primary   — TPD 14,400
-  { id: 'llama-3.1-8b-instant',     label: 'Llama 3.1 8B'    }, // Fallback 1 — TPD 500,000
-  { id: 'gemma2-9b-it',             label: 'Gemma 2 9B'      }, // Fallback 2 — TPD 14,400
-  { id: 'llama3-70b-8192',          label: 'Llama 3 70B'     }, // Fallback 3 — TPD 6,000
+  { id: 'llama-3.3-70b-versatile',   label: 'Llama 3.3 70B'    }, // Primary    — 128K ctx, TPD 14,400
+  { id: 'llama-3.1-8b-instant',      label: 'Llama 3.1 8B'     }, // Fallback 1 — 128K ctx, TPD 500,000
+  { id: 'mixtral-8x7b-32768',        label: 'Mixtral 8x7B'     }, // Fallback 2 —  32K ctx, TPD 14,400
+  { id: 'llama3-70b-8192',           label: 'Llama 3 70B'      }, // Fallback 3 —   8K ctx, TPD 6,000
 ]
 
 const callGroqWithModel = async (model, messages, maxTokens) => {
