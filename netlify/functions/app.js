@@ -557,170 +557,208 @@ async function assembleUserAppData(userId, user) {
 }
 
 async function saveUserAppData(userId, user, { subjects, practiceLibrary, passMarkPercent }) {
+  // --- Update scalar settings ---
   if (typeof passMarkPercent === 'number') {
     user.data.passMarkPercent = passMarkPercent
     user.markModified('data')
     await user.save()
   }
-  
+
+  // -----------------------------------------------------------------------
+  // SUBJECTS + UNITS + QUESTIONS + ATTEMPTS
+  // Uses bulkWrite to batch all upserts into one DB call per collection,
+  // and runs all deletes in parallel — replacing hundreds of sequential calls.
+  // -----------------------------------------------------------------------
   if (Array.isArray(subjects)) {
-    const payloadSubjectIds = subjects.map(s => s.id)
-    await Subject.deleteMany({ userId, id: { $nin: payloadSubjectIds } })
-    
+    // 1. Flatten all nested data upfront
+    const allUnits = []
+    const allQuestions = []
+    const allAttempts = []
+
     for (const s of subjects) {
-      await Subject.updateOne({ userId, id: s.id }, { name: s.name }, { upsert: true })
-      
-      if (Array.isArray(s.units)) {
-        const payloadUnitIds = s.units.map(u => u.id)
-        await Unit.deleteMany({ subjectId: s.id, id: { $nin: payloadUnitIds } })
-        
-        for (const u of s.units) {
-          await Unit.updateOne({ id: u.id }, {
-            title: u.title,
-            material: u.material || '',
-            status: u.status || 'locked',
-            bestScore: u.bestScore,
-            subjectId: s.id
-          }, { upsert: true })
-          
-          if (Array.isArray(u.questions)) {
-            const payloadQIds = u.questions.map(q => q.id)
-            await Question.deleteMany({ unitId: u.id, id: { $nin: payloadQIds } })
-            
-            for (const q of u.questions) {
-              await Question.updateOne({ id: q.id }, {
-                type: q.type,
-                question: q.question,
-                options: q.options,
-                answer: q.answer,
-                difficulty: q.difficulty || 'medium',
-                bloomLevel: q.bloomLevel || 'Remember',
-                explanation: q.explanation || '',
-                unitId: u.id
-              }, { upsert: true })
-            }
-          } else {
-            await Question.deleteMany({ unitId: u.id })
-          }
-          
-          if (Array.isArray(u.attempts)) {
-            const payloadAttemptIds = u.attempts.map(a => a.id)
-            await Attempt.deleteMany({ unitId: u.id, id: { $nin: payloadAttemptIds } })
-            
-            for (const a of u.attempts) {
-              await Attempt.updateOne({ id: a.id }, {
-                timestamp: a.timestamp,
-                responses: a.responses || {},
-                flagged: a.flagged || {},
-                score: a.score,
-                percentage: a.percentage,
-                completed: a.completed !== false,
-                timeTaken: a.timeTaken || 0,
-                difficulty: a.difficulty || 'medium',
-                userId,
-                unitId: u.id
-              }, { upsert: true })
-            }
-          } else {
-            await Attempt.deleteMany({ unitId: u.id })
-          }
-        }
-      } else {
-        await Unit.deleteMany({ subjectId: s.id })
+      for (const u of (s.units || [])) {
+        allUnits.push({ ...u, subjectId: s.id })
+        for (const q of (u.questions || [])) allQuestions.push({ ...q, unitId: u.id })
+        for (const a of (u.attempts || [])) allAttempts.push({ ...a, unitId: u.id })
       }
     }
 
-    const activeSubjects = await Subject.find({ userId }).lean()
-    const activeSubjectIds = activeSubjects.map(s => s.id)
-    await Unit.deleteMany({ subjectId: { $nin: activeSubjectIds } })
+    const subjectIds  = subjects.map(s => s.id)
+    const unitIds     = allUnits.map(u => u.id)
+    const questionIds = allQuestions.map(q => q.id)
+    const attemptIds  = allAttempts.map(a => a.id)
 
-    const activeUnits = await Unit.find({ subjectId: { $in: activeSubjectIds } }).lean()
-    const activeUnitIds = activeUnits.map(u => u.id)
-    await Question.deleteMany({ unitId: { $nin: activeUnitIds } })
-    await Attempt.deleteMany({ userId, unitId: { $nin: activeUnitIds } })
+    // 2. Delete removed documents in parallel
+    await Promise.all([
+      Subject.deleteMany({ userId, id: { $nin: subjectIds } }),
+      Unit.deleteMany({ subjectId: { $in: subjectIds }, id: { $nin: unitIds } }),
+      unitIds.length ? Question.deleteMany({ unitId: { $in: unitIds }, id: { $nin: questionIds } }) : Promise.resolve(),
+      unitIds.length ? Attempt.deleteMany({ userId, unitId: { $in: unitIds }, id: { $nin: attemptIds } }) : Promise.resolve(),
+    ])
+
+    // 3. Bulk-upsert all subjects in one call
+    if (subjects.length > 0) {
+      await Subject.bulkWrite(
+        subjects.map(s => ({
+          updateOne: {
+            filter: { userId, id: s.id },
+            update: { $set: { name: s.name, userId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 4. Bulk-upsert all units in one call
+    if (allUnits.length > 0) {
+      await Unit.bulkWrite(
+        allUnits.map(u => ({
+          updateOne: {
+            filter: { id: u.id },
+            update: { $set: { title: u.title, material: u.material || '', status: u.status || 'locked', bestScore: u.bestScore, subjectId: u.subjectId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 5. Bulk-upsert all questions in one call
+    if (allQuestions.length > 0) {
+      await Question.bulkWrite(
+        allQuestions.map(q => ({
+          updateOne: {
+            filter: { id: q.id },
+            update: { $set: { type: q.type, question: q.question, options: q.options, answer: q.answer, difficulty: q.difficulty || 'medium', bloomLevel: q.bloomLevel || 'Remember', explanation: q.explanation || '', unitId: q.unitId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 6. Bulk-upsert all attempts in one call
+    if (allAttempts.length > 0) {
+      await Attempt.bulkWrite(
+        allAttempts.map(a => ({
+          updateOne: {
+            filter: { id: a.id },
+            update: { $set: { timestamp: a.timestamp, responses: a.responses || {}, flagged: a.flagged || {}, score: a.score, percentage: a.percentage, completed: a.completed !== false, timeTaken: a.timeTaken || 0, difficulty: a.difficulty || 'medium', userId, unitId: a.unitId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
   }
-  
+
+  // -----------------------------------------------------------------------
+  // PRACTICE LIBRARY: COURSES + MODULES + VERSIONS + QUESTIONS + ATTEMPTS
+  // Same bulkWrite pattern as above.
+  // -----------------------------------------------------------------------
   if (Array.isArray(practiceLibrary)) {
-    const payloadCourseIds = practiceLibrary.map(c => c.id)
-    await Course.deleteMany({ userId, id: { $nin: payloadCourseIds } })
-    
+    // 1. Flatten all nested data upfront
+    const allModules         = []
+    const allVersions        = []
+    const allPracticeQs      = []
+    const allPracticeAttempts = []
+
     for (const c of practiceLibrary) {
-      await Course.updateOne({ userId, id: c.id }, { name: c.name }, { upsert: true })
-      
-      if (Array.isArray(c.modules)) {
-        const payloadModuleIds = c.modules.map(m => m.id)
-        await Module.deleteMany({ courseId: c.id, id: { $nin: payloadModuleIds } })
-        
-        for (const m of c.modules) {
-          await Module.updateOne({ id: m.id }, { name: m.name, courseId: c.id }, { upsert: true })
-          
-          if (Array.isArray(m.versions)) {
-            const payloadVersionIds = m.versions.map(v => v.id)
-            await PracticeVersion.deleteMany({ moduleId: m.id, id: { $nin: payloadVersionIds } })
-            
-            for (const v of m.versions) {
-              await PracticeVersion.updateOne({ id: v.id }, { name: v.name, type: v.type, moduleId: m.id }, { upsert: true })
-              
-              if (Array.isArray(v.questions)) {
-                const payloadQIds = v.questions.map(q => q.id)
-                await PracticeQuestion.deleteMany({ versionId: v.id, id: { $nin: payloadQIds } })
-                
-                for (const q of v.questions) {
-                  await PracticeQuestion.updateOne({ id: q.id }, {
-                    type: q.type,
-                    question: q.question,
-                    options: q.options,
-                    answer: q.answer,
-                    explanation: q.explanation || '',
-                    sourceQuote: q.sourceQuote || '',
-                    confidence: q.confidence ?? 1.0,
-                    versionId: v.id
-                  }, { upsert: true })
-                }
-              } else {
-                await PracticeQuestion.deleteMany({ versionId: v.id })
-              }
-              
-              if (Array.isArray(v.attempts)) {
-                const payloadAttemptIds = v.attempts.map(a => a.id)
-                await PracticeAttempt.deleteMany({ versionId: v.id, id: { $nin: payloadAttemptIds } })
-                
-                for (const a of v.attempts) {
-                  await PracticeAttempt.updateOne({ id: a.id }, {
-                    score: a.score,
-                    percentage: a.percentage,
-                    responses: a.responses || {},
-                    startTime: a.startTime,
-                    endTime: a.endTime,
-                    userId,
-                    versionId: v.id
-                  }, { upsert: true })
-                }
-              } else {
-                await PracticeAttempt.deleteMany({ versionId: v.id })
-              }
-            }
-          } else {
-            await PracticeVersion.deleteMany({ moduleId: m.id })
-          }
+      for (const m of (c.modules || [])) {
+        allModules.push({ ...m, courseId: c.id })
+        for (const v of (m.versions || [])) {
+          allVersions.push({ ...v, moduleId: m.id })
+          for (const q of (v.questions || [])) allPracticeQs.push({ ...q, versionId: v.id })
+          for (const a of (v.attempts || [])) allPracticeAttempts.push({ ...a, versionId: v.id })
         }
-      } else {
-        await Module.deleteMany({ courseId: c.id })
       }
     }
 
-    const activeCourses = await Course.find({ userId }).lean()
-    const activeCourseIds = activeCourses.map(c => c.id)
-    await Module.deleteMany({ courseId: { $nin: activeCourseIds } })
+    const courseIds   = practiceLibrary.map(c => c.id)
+    const moduleIds   = allModules.map(m => m.id)
+    const versionIds  = allVersions.map(v => v.id)
+    const pqIds       = allPracticeQs.map(q => q.id)
+    const paIds       = allPracticeAttempts.map(a => a.id)
 
-    const activeModules = await Module.find({ courseId: { $in: activeCourseIds } }).lean()
-    const activeModuleIds = activeModules.map(m => m.id)
-    await PracticeVersion.deleteMany({ moduleId: { $nin: activeModuleIds } })
+    // 2. Delete removed documents in parallel
+    await Promise.all([
+      Course.deleteMany({ userId, id: { $nin: courseIds } }),
+      Module.deleteMany({ courseId: { $in: courseIds }, id: { $nin: moduleIds } }),
+      moduleIds.length  ? PracticeVersion.deleteMany({ moduleId: { $in: moduleIds }, id: { $nin: versionIds } }) : Promise.resolve(),
+      versionIds.length ? PracticeQuestion.deleteMany({ versionId: { $in: versionIds }, id: { $nin: pqIds } }) : Promise.resolve(),
+      versionIds.length ? PracticeAttempt.deleteMany({ userId, versionId: { $in: versionIds }, id: { $nin: paIds } }) : Promise.resolve(),
+    ])
 
-    const activeVersions = await PracticeVersion.find({ moduleId: { $in: activeModuleIds } }).lean()
-    const activeVersionIds = activeVersions.map(v => v.id)
-    await PracticeQuestion.deleteMany({ versionId: { $nin: activeVersionIds } })
-    await PracticeAttempt.deleteMany({ userId, versionId: { $nin: activeVersionIds } })
+    // 3. Bulk-upsert courses
+    if (practiceLibrary.length > 0) {
+      await Course.bulkWrite(
+        practiceLibrary.map(c => ({
+          updateOne: {
+            filter: { userId, id: c.id },
+            update: { $set: { name: c.name, userId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 4. Bulk-upsert modules
+    if (allModules.length > 0) {
+      await Module.bulkWrite(
+        allModules.map(m => ({
+          updateOne: {
+            filter: { id: m.id },
+            update: { $set: { name: m.name, courseId: m.courseId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 5. Bulk-upsert versions
+    if (allVersions.length > 0) {
+      await PracticeVersion.bulkWrite(
+        allVersions.map(v => ({
+          updateOne: {
+            filter: { id: v.id },
+            update: { $set: { name: v.name, type: v.type, moduleId: v.moduleId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 6. Bulk-upsert practice questions
+    if (allPracticeQs.length > 0) {
+      await PracticeQuestion.bulkWrite(
+        allPracticeQs.map(q => ({
+          updateOne: {
+            filter: { id: q.id },
+            update: { $set: { type: q.type, question: q.question, options: q.options, answer: q.answer, explanation: q.explanation || '', sourceQuote: q.sourceQuote || '', confidence: q.confidence ?? 1.0, versionId: q.versionId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+
+    // 7. Bulk-upsert practice attempts
+    if (allPracticeAttempts.length > 0) {
+      await PracticeAttempt.bulkWrite(
+        allPracticeAttempts.map(a => ({
+          updateOne: {
+            filter: { id: a.id },
+            update: { $set: { score: a.score, percentage: a.percentage, responses: a.responses || {}, startTime: a.startTime, endTime: a.endTime, userId, versionId: a.versionId } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
   }
 }
 
