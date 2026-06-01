@@ -148,7 +148,17 @@ const safeJsonArray = (text) => {
   return JSON.parse(text.slice(start, end + 1))
 }
 
-const callGroq = async (messages, maxTokens = 5000) => {
+// Groq free-tier model fallback chain.
+// If a model returns 429 (rate limited), the next model in the list is tried automatically.
+// Models are ordered by quality first, then by daily token limit as a tiebreaker.
+const GROQ_MODELS = [
+  { id: 'llama-3.3-70b-versatile',  label: 'Llama 3.3 70B'   }, // Primary   — TPD 14,400
+  { id: 'llama-3.1-8b-instant',     label: 'Llama 3.1 8B'    }, // Fallback 1 — TPD 500,000
+  { id: 'gemma2-9b-it',             label: 'Gemma 2 9B'      }, // Fallback 2 — TPD 14,400
+  { id: 'llama3-70b-8192',          label: 'Llama 3 70B'     }, // Fallback 3 — TPD 6,000
+]
+
+const callGroqWithModel = async (model, messages, maxTokens) => {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -156,7 +166,7 @@ const callGroq = async (messages, maxTokens = 5000) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: model.id,
       messages,
       temperature: 0.3,
       max_tokens: maxTokens,
@@ -164,18 +174,45 @@ const callGroq = async (messages, maxTokens = 5000) => {
   })
 
   if (response.status === 429) {
-    const error = new Error('RATE_LIMIT')
-    error.status = 429
-    throw error
+    console.warn(`[Groq] Model "${model.label}" is rate-limited, trying next fallback...`)
+    const rateLimitError = new Error('RATE_LIMIT')
+    rateLimitError.status = 429
+    throw rateLimitError
   }
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
-    throw new Error(data.error?.message || 'Groq request failed')
+    throw new Error(data.error?.message || `Groq request failed with model ${model.label}`)
   }
 
   const data = await response.json()
-  return data.choices?.[0]?.message?.content ?? ''
+  const content = data.choices?.[0]?.message?.content ?? ''
+  if (model.id !== GROQ_MODELS[0].id) {
+    console.log(`[Groq] Successfully served by fallback model: ${model.label}`)
+  }
+  return content
+}
+
+const callGroq = async (messages, maxTokens = 5000) => {
+  let lastError = null
+
+  for (const model of GROQ_MODELS) {
+    try {
+      return await callGroqWithModel(model, messages, maxTokens)
+    } catch (error) {
+      lastError = error
+      // Only continue the fallback chain on rate limit errors
+      if (error.status !== 429) {
+        throw error
+      }
+    }
+  }
+
+  // All models exhausted — surface a clear rate limit error
+  console.error('[Groq] All models are rate-limited. No further fallbacks available.')
+  const exhaustedError = new Error('All Groq models are currently rate-limited. Please try again later (limits reset at midnight UTC).')
+  exhaustedError.status = 429
+  throw exhaustedError
 }
 
 app.post('/api/auth/register', async (req, res) => {
