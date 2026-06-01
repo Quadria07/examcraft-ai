@@ -876,7 +876,7 @@ app.post('/api/groq/questions', verifyAuth, async (req, res) => {
     return res.json({ questions })
   } catch (error) {
     if (error.status === 429) {
-      return res.status(429).json({ message: 'Groq rate limit reached' })
+      return res.status(429).json({ message: error.message || 'Groq rate limit reached' })
     }
     return res.status(500).json({ message: error.message || 'Question generation failed' })
   }
@@ -898,7 +898,7 @@ app.post('/api/groq/explain', verifyAuth, async (req, res) => {
     return res.json({ explanation: explanation.trim() })
   } catch (error) {
     if (error.status === 429) {
-      return res.status(429).json({ message: 'Groq rate limit reached' })
+      return res.status(429).json({ message: error.message || 'Groq rate limit reached' })
     }
     return res.status(500).json({ message: error.message || 'Explanation failed' })
   }
@@ -922,7 +922,7 @@ app.post('/api/groq/units', verifyAuth, async (req, res) => {
     return res.json({ units })
   } catch (error) {
     if (error.status === 429) {
-      return res.status(429).json({ message: 'Groq rate limit reached' })
+      return res.status(429).json({ message: error.message || 'Groq rate limit reached' })
     }
     return res.status(500).json({ message: error.message || 'Unit suggestion failed' })
   }
@@ -973,7 +973,7 @@ Do not include any pre-text, post-text, or explanations outside the JSON array.`
     return res.json({ questions: transformed })
   } catch (error) {
     if (error.status === 429) {
-      return res.status(429).json({ message: 'Groq rate limit reached' })
+      return res.status(429).json({ message: error.message || 'Groq rate limit reached' })
     }
     return res.status(500).json({ message: error.message || 'Transformation failed' })
   }
@@ -997,7 +997,7 @@ app.post('/api/groq/practice/extract', verifyAuth, async (req, res) => {
     return res.json({ questions })
   } catch (error) {
     if (error.status === 429) {
-      return res.status(429).json({ message: 'Groq rate limit reached' })
+      return res.status(429).json({ message: error.message || 'Groq rate limit reached' })
     }
     return res.status(500).json({ message: error.message || 'Practice extraction failed' })
   }
@@ -1021,7 +1021,7 @@ app.post('/api/groq/practice/validate', verifyAuth, async (req, res) => {
     return res.json({ questions: validated })
   } catch (error) {
     if (error.status === 429) {
-      return res.status(429).json({ message: 'Groq rate limit reached' })
+      return res.status(429).json({ message: error.message || 'Groq rate limit reached' })
     }
     return res.status(500).json({ message: error.message || 'Validation failed' })
   }
