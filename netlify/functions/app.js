@@ -156,8 +156,8 @@ const safeJsonArray = (text) => {
 const GROQ_MODELS = [
   { id: 'llama-3.3-70b-versatile',   label: 'Llama 3.3 70B'    }, // Primary    — 128K ctx, TPD 14,400
   { id: 'llama-3.1-8b-instant',      label: 'Llama 3.1 8B'     }, // Fallback 1 — 128K ctx, TPD 500,000
-  { id: 'llama3-8b-8192',            label: 'Llama 3 8B'       }, // Fallback 2 —   8K ctx, TPD 14,400
-  { id: 'llama3-70b-8192',           label: 'Llama 3 70B'      }, // Fallback 3 —   8K ctx, TPD 6,000
+  { id: 'gemma2-9b-it',              label: 'Gemma 2 9B'       }, // Fallback 2 —   8K ctx, TPD 14,400
+  { id: 'llama-3.1-70b-versatile',   label: 'Llama 3.1 70B'    }, // Fallback 3 — 128K ctx, TPD 14,400
 ]
 
 const callGroqWithModel = async (model, messages, maxTokens) => {
@@ -176,26 +176,29 @@ const callGroqWithModel = async (model, messages, maxTokens) => {
   })
 
   if (response.status === 429) {
-    console.warn(`[Groq] Model "${model.label}" is rate-limited, trying next fallback...`)
-    const rateLimitError = new Error('RATE_LIMIT')
-    rateLimitError.status = 429
-    throw rateLimitError
+    console.warn(`[Groq] Model "${model.label}" is rate-limited (429), trying next fallback...`)
+    const err = new Error('RATE_LIMIT')
+    err.status = 429
+    throw err
   }
 
-  // 404 means the model is deprecated or unavailable — skip to next fallback
-  if (response.status === 404) {
+  // Treat ANY other 4xx as "this model is unavailable" and skip to the next.
+  // Groq returns 400 (not 404) for decommissioned/removed models.
+  // We only stop the chain on 5xx (real server errors).
+  if (response.status >= 400 && response.status < 500) {
     const data = await response.json().catch(() => ({}))
-    const groqMsg = data.error?.message || 'model not found'
-    console.warn(`[Groq] Model "${model.label}" unavailable (404): ${groqMsg} — trying next fallback...`)
-    const notFoundError = new Error('MODEL_NOT_FOUND')
-    notFoundError.status = 429 // treat like rate-limit so the chain continues
-    throw notFoundError
+    const groqMsg = data.error?.message || `HTTP ${response.status}`
+    console.warn(`[Groq] Model "${model.label}" skipped (${response.status}): ${groqMsg} — trying next fallback...`)
+    const err = new Error('MODEL_UNAVAILABLE')
+    err.status = 429 // use 429 so the fallback chain continues
+    throw err
   }
 
   if (!response.ok) {
+    // 5xx — real server error, stop the chain
     const data = await response.json().catch(() => ({}))
-    const errMsg = data.error?.message || `Groq request failed with model ${model.label}`
-    console.error(`[Groq] Model "${model.label}" returned ${response.status}: ${errMsg}`)
+    const errMsg = data.error?.message || `Groq server error ${response.status} on model ${model.label}`
+    console.error(`[Groq] Server error from "${model.label}" (${response.status}): ${errMsg}`)
     throw new Error(errMsg)
   }
 
